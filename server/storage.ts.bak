@@ -186,25 +186,8 @@ export class MemStorage implements IStorage {
 
   // Initialize default photos with stock image data
   private initializeDefaultPhotos() {
-    // Nothing to initialize since all default photos have been removed as requested
+    // Nothing to initialize since all default photos have been removed
     // This method is kept for future extensions if needed
-  }
-
-  // Helper to save metadata for a photo
-  private savePhotoMetadata(photo: Photo) {
-    try {
-      const uploadsDir = path.join(process.cwd(), "uploads");
-      const metadataPath = path.join(uploadsDir, `${photo.fileName}.metadata.json`);
-      const metadata = {
-        title: photo.title,
-        description: photo.description,
-        isLiked: photo.isLiked,
-        collectionId: photo.collectionId
-      };
-      fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
-    } catch (error) {
-      console.error(`Error saving metadata for photo ${photo.id}:`, error);
-    }
   }
 
   // User operations
@@ -317,10 +300,6 @@ export class MemStorage implements IStorage {
     };
     
     this.photos.set(id, photo);
-    
-    // Save metadata to a JSON file to persist title and other information across restarts
-    this.savePhotoMetadata(photo);
-    
     return photo;
   }
   
@@ -344,27 +323,10 @@ export class MemStorage implements IStorage {
     };
     
     this.photos.set(id, updatedPhoto);
-    
-    // Save updated metadata
-    this.savePhotoMetadata(updatedPhoto);
-    
     return updatedPhoto;
   }
   
   async deletePhoto(id: number): Promise<boolean> {
-    const photo = this.photos.get(id);
-    if (photo) {
-      // Try to delete metadata file if it exists
-      try {
-        const uploadsDir = path.join(process.cwd(), "uploads");
-        const metadataPath = path.join(uploadsDir, `${photo.fileName}.metadata.json`);
-        if (fs.existsSync(metadataPath)) {
-          fs.unlinkSync(metadataPath);
-        }
-      } catch (error) {
-        console.error(`Error deleting metadata for photo ${id}:`, error);
-      }
-    }
     return this.photos.delete(id);
   }
   
@@ -377,10 +339,6 @@ export class MemStorage implements IStorage {
       isLiked: !photo.isLiked,
     };
     this.photos.set(id, updatedPhoto);
-    
-    // Save updated metadata
-    this.savePhotoMetadata(updatedPhoto);
-    
     return updatedPhoto;
   }
 }
