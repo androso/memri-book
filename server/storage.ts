@@ -1,5 +1,7 @@
 import { users, collections, photos, type User, type InsertUser, type Collection, type InsertCollection, type Photo, type InsertPhoto } from "@shared/schema";
 import { format } from "date-fns";
+import fs from "fs";
+import path from "path";
 
 export interface IStorage {
   // User operations
@@ -42,6 +44,94 @@ export class MemStorage implements IStorage {
     // Initialize with default collections for demo purposes
     this.initializeDefaultCollections();
     this.initializeDefaultPhotos();
+    
+    // Scan the uploads directory to include real uploaded photos
+    this.scanUploadsDirectory();
+  }
+  
+  // Scan uploads directory to find real user uploads
+  private scanUploadsDirectory() {
+    try {
+      const uploadsDir = path.join(process.cwd(), "uploads");
+      // Create the uploads directory if it doesn't exist
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+        console.log("Created uploads directory");
+        return; // No files to scan in a new directory
+      }
+      
+      const files = fs.readdirSync(uploadsDir);
+      
+      // Process any files that start with "photo-" (this matches multer naming pattern)
+      const uploadedFiles = files.filter(file => file.startsWith('photo-'));
+      
+      uploadedFiles.forEach(fileName => {
+        // Check if we already have this photo in our map (avoid duplicates)
+        const existingPhoto = Array.from(this.photos.values()).find(
+          photo => photo.fileName === fileName
+        );
+        
+        if (!existingPhoto) {
+          // Get default collection (All Photos)
+          const defaultCollection = Array.from(this.collections.values()).find(
+            c => c.name === "All Photos"
+          );
+          
+          // Create a new photo entry
+          const uploadDate = this.extractDateFromFileName(fileName) || new Date();
+          const photo: Photo = {
+            id: this.photoId++,
+            title: `Uploaded Photo ${this.photoId}`,
+            description: "Uploaded by user",
+            fileName: fileName,
+            fileType: this.getFileType(fileName),
+            filePath: `/uploads/${fileName}`,
+            isLiked: false,
+            collectionId: defaultCollection?.id ?? 1,
+            userId: 1, // Default user
+            uploadedAt: uploadDate
+          };
+          
+          this.photos.set(photo.id, photo);
+          console.log(`Loaded user upload: ${fileName}`);
+        }
+      });
+    } catch (error) {
+      console.error("Error scanning uploads directory:", error);
+    }
+  }
+  
+  private extractDateFromFileName(fileName: string): Date | null {
+    try {
+      // Extract timestamp from filenames like "photo-1743260503114-360974261.jpg"
+      const match = fileName.match(/photo-(\d+)-/);
+      if (match && match[1]) {
+        const timestamp = parseInt(match[1]);
+        if (!isNaN(timestamp)) {
+          return new Date(timestamp);
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+  
+  private getFileType(fileName: string): string {
+    const ext = path.extname(fileName).toLowerCase();
+    switch (ext) {
+      case '.jpg':
+      case '.jpeg':
+        return 'image/jpeg';
+      case '.png':
+        return 'image/png';
+      case '.gif':
+        return 'image/gif';
+      case '.webp':
+        return 'image/webp';
+      default:
+        return 'image/jpeg'; // Default fallback
+    }
   }
 
   // Initialize default collections
@@ -61,10 +151,14 @@ export class MemStorage implements IStorage {
     ];
 
     collections.forEach(col => {
+      // Ensure all required fields are present
       const collection: Collection = {
-        ...col,
         id: this.collectionId++,
-        createdAt: new Date(),
+        name: col.name,
+        description: col.description || null,
+        type: col.type || "custom",
+        userId: col.userId || 1,
+        createdAt: new Date()
       };
       this.collections.set(collection.id, collection);
     });
@@ -84,7 +178,7 @@ export class MemStorage implements IStorage {
         fileType: "image/jpeg",
         filePath: "/uploads/mountain_1.jpg",
         isLiked: true,
-        collectionId: defaultCollections.find(c => c.type === "nature")?.id || 1,
+        collectionId: defaultCollections.find(c => c.type === "nature")?.id ?? 1,
         uploadedAt: new Date("2023-04-12")
       },
       {
@@ -94,7 +188,7 @@ export class MemStorage implements IStorage {
         fileType: "image/jpeg",
         filePath: "/uploads/forest_1.jpg",
         isLiked: true,
-        collectionId: defaultCollections.find(c => c.type === "nature")?.id || 1,
+        collectionId: defaultCollections.find(c => c.type === "nature")?.id ?? 1,
         uploadedAt: new Date("2023-05-03")
       },
       {
@@ -104,7 +198,7 @@ export class MemStorage implements IStorage {
         fileType: "image/jpeg",
         filePath: "/uploads/valley_1.jpg",
         isLiked: false,
-        collectionId: defaultCollections.find(c => c.type === "nature")?.id || 1,
+        collectionId: defaultCollections.find(c => c.type === "nature")?.id ?? 1,
         uploadedAt: new Date("2023-06-15")
       },
       {
@@ -114,7 +208,7 @@ export class MemStorage implements IStorage {
         fileType: "image/jpeg",
         filePath: "/uploads/lake_1.jpg",
         isLiked: true,
-        collectionId: defaultCollections.find(c => c.type === "travels")?.id || 2,
+        collectionId: defaultCollections.find(c => c.type === "travels")?.id ?? 2,
         uploadedAt: new Date("2023-07-02")
       },
       {
@@ -124,7 +218,7 @@ export class MemStorage implements IStorage {
         fileType: "image/jpeg",
         filePath: "/uploads/meadow_1.jpg",
         isLiked: false,
-        collectionId: defaultCollections.find(c => c.type === "nature")?.id || 1,
+        collectionId: defaultCollections.find(c => c.type === "nature")?.id ?? 1,
         uploadedAt: new Date("2023-04-29")
       },
       {
@@ -134,7 +228,7 @@ export class MemStorage implements IStorage {
         fileType: "image/jpeg",
         filePath: "/uploads/path_1.jpg",
         isLiked: true,
-        collectionId: defaultCollections.find(c => c.type === "travels")?.id || 2,
+        collectionId: defaultCollections.find(c => c.type === "travels")?.id ?? 2,
         uploadedAt: new Date("2023-08-16")
       },
       {
@@ -144,16 +238,24 @@ export class MemStorage implements IStorage {
         fileType: "image/jpeg",
         filePath: "/uploads/sunset_1.jpg",
         isLiked: false,
-        collectionId: defaultCollections.find(c => c.type === "travels")?.id || 2,
+        collectionId: defaultCollections.find(c => c.type === "travels")?.id ?? 2,
         uploadedAt: new Date("2023-09-03")
       }
     ];
     
     photoData.forEach(data => {
+      // Create a properly typed Photo object
       const photo: Photo = {
-        ...data,
         id: this.photoId++,
-        userId: defaultUserId
+        title: data.title,
+        fileName: data.fileName,
+        fileType: data.fileType,
+        filePath: data.filePath,
+        description: data.description || null,
+        userId: defaultUserId,
+        isLiked: data.isLiked || false,
+        collectionId: data.collectionId || 1,
+        uploadedAt: data.uploadedAt || new Date()
       };
       this.photos.set(photo.id, photo);
     });
@@ -191,7 +293,18 @@ export class MemStorage implements IStorage {
   async createCollection(insertCollection: InsertCollection): Promise<Collection> {
     const id = this.collectionId++;
     const now = new Date();
-    const collection: Collection = { ...insertCollection, id, createdAt: now };
+    
+    // Ensure all required fields are present with defaults if needed
+    const collection: Collection = { 
+      ...insertCollection, 
+      id,
+      name: insertCollection.name,
+      type: insertCollection.type || "custom",
+      description: insertCollection.description || null,
+      userId: insertCollection.userId || 1,
+      createdAt: now 
+    };
+    
     this.collections.set(id, collection);
     return collection;
   }
@@ -200,10 +313,17 @@ export class MemStorage implements IStorage {
     const collection = this.collections.get(id);
     if (!collection) return undefined;
     
+    // Ensure we maintain the required types
     const updatedCollection: Collection = {
       ...collection,
-      ...collectionUpdate,
+      name: collectionUpdate.name || collection.name,
+      type: collectionUpdate.type || collection.type,
+      description: collectionUpdate.description !== undefined ? collectionUpdate.description : collection.description,
+      userId: collectionUpdate.userId !== undefined ? collectionUpdate.userId : collection.userId,
+      id: collection.id,
+      createdAt: collection.createdAt
     };
+    
     this.collections.set(id, updatedCollection);
     return updatedCollection;
   }
@@ -221,7 +341,9 @@ export class MemStorage implements IStorage {
         return true;
       })
       .sort((a, b) => {
-        return new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime();
+        const dateA = a.uploadedAt instanceof Date ? a.uploadedAt : new Date(a.uploadedAt || 0);
+        const dateB = b.uploadedAt instanceof Date ? b.uploadedAt : new Date(b.uploadedAt || 0);
+        return dateB.getTime() - dateA.getTime();
       });
   }
   
@@ -232,7 +354,22 @@ export class MemStorage implements IStorage {
   async createPhoto(insertPhoto: InsertPhoto): Promise<Photo> {
     const id = this.photoId++;
     const now = new Date();
-    const photo: Photo = { ...insertPhoto, id, uploadedAt: now };
+    
+    // Ensure all required fields are present with defaults if needed
+    const photo: Photo = { 
+      ...insertPhoto, 
+      id,
+      title: insertPhoto.title,
+      fileName: insertPhoto.fileName,
+      fileType: insertPhoto.fileType,
+      filePath: insertPhoto.filePath,
+      description: insertPhoto.description || null,
+      userId: insertPhoto.userId || 1,
+      isLiked: insertPhoto.isLiked || false,
+      collectionId: insertPhoto.collectionId || 1,
+      uploadedAt: now 
+    };
+    
     this.photos.set(id, photo);
     return photo;
   }
@@ -241,10 +378,21 @@ export class MemStorage implements IStorage {
     const photo = this.photos.get(id);
     if (!photo) return undefined;
     
+    // Ensure we maintain the required types
     const updatedPhoto: Photo = {
       ...photo,
-      ...photoUpdate,
+      title: photoUpdate.title || photo.title,
+      fileName: photoUpdate.fileName || photo.fileName,
+      fileType: photoUpdate.fileType || photo.fileType,
+      filePath: photoUpdate.filePath || photo.filePath,
+      description: photoUpdate.description !== undefined ? photoUpdate.description : photo.description,
+      userId: photoUpdate.userId !== undefined ? photoUpdate.userId : photo.userId,
+      isLiked: photoUpdate.isLiked !== undefined ? photoUpdate.isLiked : photo.isLiked,
+      collectionId: photoUpdate.collectionId !== undefined ? photoUpdate.collectionId : photo.collectionId,
+      id: photo.id,
+      uploadedAt: photo.uploadedAt
     };
+    
     this.photos.set(id, updatedPhoto);
     return updatedPhoto;
   }
