@@ -1,12 +1,14 @@
+import { useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Photo } from "@shared/schema";
+import { Collection, Photo } from "@shared/schema";
 import { formatDate } from "@/lib/constants";
-import { Heart, Share2, X } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
+import { Heart, Share2, X, Edit } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { API_ENDPOINTS } from "@/lib/constants";
+import EditPhotoModal from "./EditPhotoModal";
 
 interface PhotoModalProps {
   photo: Photo;
@@ -15,6 +17,14 @@ interface PhotoModalProps {
 }
 
 export default function PhotoModal({ photo, isOpen, onClose }: PhotoModalProps) {
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  
+  // Fetch collections for the edit modal
+  const { data: collections = [] } = useQuery<Collection[]>({
+    queryKey: [API_ENDPOINTS.collections],
+    enabled: isEditModalOpen,
+  });
+
   // Toggle like mutation
   const likeMutation = useMutation({
     mutationFn: () => apiRequest("POST", API_ENDPOINTS.likePhoto(photo.id), {}),
@@ -25,6 +35,10 @@ export default function PhotoModal({ photo, isOpen, onClose }: PhotoModalProps) 
 
   const handleLike = () => {
     likeMutation.mutate();
+  };
+  
+  const handleEditClick = () => {
+    setIsEditModalOpen(true);
   };
 
   return (
@@ -66,11 +80,28 @@ export default function PhotoModal({ photo, isOpen, onClose }: PhotoModalProps) 
                   <Share2 className="h-5 w-5" />
                   Share
                 </Button>
+                <Button 
+                  variant="ghost" 
+                  className="flex items-center gap-2"
+                  onClick={handleEditClick}
+                >
+                  <Edit className="h-5 w-5" />
+                  Edit
+                </Button>
               </div>
             </div>
           </div>
         </div>
       </DialogContent>
+      
+      {isEditModalOpen && collections.length > 0 && (
+        <EditPhotoModal
+          photo={photo}
+          collections={collections}
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+        />
+      )}
     </Dialog>
   );
 }

@@ -1,7 +1,7 @@
 import { useParams, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { API_ENDPOINTS } from "@/lib/constants";
-import { Photo } from "@shared/schema";
+import { Collection, Photo } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient"; 
 import { useState } from "react";
@@ -12,12 +12,14 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Heart, Share2, Edit, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import EditPhotoModal from "@/components/modals/EditPhotoModal";
 
 export default function ViewPhoto() {
   const { id } = useParams();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Fetch photo details
   const { 
@@ -25,21 +27,27 @@ export default function ViewPhoto() {
     isLoading, 
     error 
   } = useQuery<Photo>({
-    queryKey: [API_ENDPOINTS.photo(id)],
+    queryKey: [API_ENDPOINTS.photo(id || '')],
   });
 
   // Toggle like mutation
   const likeMutation = useMutation({
-    mutationFn: () => apiRequest("POST", API_ENDPOINTS.likePhoto(id), {}),
+    mutationFn: () => apiRequest("POST", API_ENDPOINTS.likePhoto(id || ''), {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.photo(id)] });
+      queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.photo(id || '')] });
       queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.photos] });
     }
   });
 
+  // Fetch collections for the edit modal
+  const { data: collections = [] } = useQuery<Collection[]>({
+    queryKey: [API_ENDPOINTS.collections],
+    enabled: isEditModalOpen,
+  });
+  
   // Delete photo mutation
   const deleteMutation = useMutation({
-    mutationFn: () => apiRequest("DELETE", API_ENDPOINTS.photo(id), {}),
+    mutationFn: () => apiRequest("DELETE", API_ENDPOINTS.photo(id || ''), {}),
     onSuccess: () => {
       toast({
         title: "Photo deleted",
@@ -68,6 +76,10 @@ export default function ViewPhoto() {
 
   const handleLike = () => {
     likeMutation.mutate();
+  };
+  
+  const handleEditClick = () => {
+    setIsEditModalOpen(true);
   };
 
   if (isLoading) {
@@ -152,7 +164,11 @@ export default function ViewPhoto() {
                   Share
                 </Button>
                 
-                <Button variant="outline" className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  className="flex items-center gap-2"
+                  onClick={handleEditClick}
+                >
                   <Edit className="h-5 w-5" />
                   Edit
                 </Button>
@@ -171,6 +187,15 @@ export default function ViewPhoto() {
           </div>
         </HandDrawn>
       </div>
+      
+      {isEditModalOpen && collections.length > 0 && photo && (
+        <EditPhotoModal
+          photo={photo}
+          collections={collections}
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+        />
+      )}
     </div>
   );
 }

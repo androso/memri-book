@@ -49,7 +49,10 @@ export const API_ENDPOINTS = {
 };
 
 // Format date in a human-readable way
-export const formatDate = (date: string | Date) => {
+export const formatDate = (date: string | Date | null) => {
+  if (!date) {
+    date = new Date();
+  }
   const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' };
   return new Date(date).toLocaleDateString('en-US', options);
 };
