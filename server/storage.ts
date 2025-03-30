@@ -2,6 +2,9 @@ import { users, collections, photos, type User, type InsertUser, type Collection
 import { format } from "date-fns";
 import fs from "fs";
 import path from "path";
+import { eq, and, desc } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 
 export interface IStorage {
   // User operations
@@ -25,97 +28,124 @@ export interface IStorage {
   toggleLikePhoto(id: number): Promise<Photo | undefined>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private collections: Map<number, Collection>;
-  private photos: Map<number, Photo>;
-  private userId: number;
-  private collectionId: number;
-  private photoId: number;
+// Database connection
+const connectionString = process.env.DATABASE_URL!;
+const client = postgres(connectionString);
+const db = drizzle(client);
 
+export class DbStorage implements IStorage {
   constructor() {
-    this.users = new Map();
-    this.collections = new Map();
-    this.photos = new Map();
-    this.userId = 1;
-    this.collectionId = 1;
-    this.photoId = 1;
-    
-    // Initialize with default collections for demo purposes
-    this.initializeDefaultCollections();
-    this.initializeDefaultPhotos();
-    
-    // Scan the uploads directory to include real uploaded photos
-    this.scanUploadsDirectory();
+    // Initialize database schema and data
+    this.initialize();
   }
   
-  // Scan uploads directory to find real user uploads
-  private scanUploadsDirectory() {
+  private async initialize() {
     try {
+      console.log("Initializing database...");
+      
+      // Check if default user exists
+      const defaultUser = await this.getUserByUsername("demo_user");
+      if (!defaultUser) {
+        console.log("Creating default user...");
+        await this.createUser({
+          username: "demo_user",
+          password: "password"
+        });
+        
+        // Create default collections
+        await this.initializeDefaultCollections();
+      }
+      
+      // Make sure the uploads directory exists
       const uploadsDir = path.join(process.cwd(), "uploads");
-      // Create the uploads directory if it doesn't exist
       if (!fs.existsSync(uploadsDir)) {
         fs.mkdirSync(uploadsDir, { recursive: true });
         console.log("Created uploads directory");
-        return; // No files to scan in a new directory
       }
       
+      // Scan uploads directory
+      await this.scanUploadsDirectory();
+      
+      console.log("Database initialization complete");
+    } catch (error) {
+      console.error("Error initializing database:", error);
+    }
+  }
+  
+  private async scanUploadsDirectory() {
+    const uploadsDir = path.join(process.cwd(), "uploads");
+    
+    try {
       const files = fs.readdirSync(uploadsDir);
       
       // Process any files that start with "photo-" (this matches multer naming pattern)
       const uploadedFiles = files.filter(file => file.startsWith('photo-'));
       
-      uploadedFiles.forEach(fileName => {
-        // Check if we already have this photo in our map (avoid duplicates)
-        const existingPhoto = Array.from(this.photos.values()).find(
-          photo => photo.fileName === fileName
-        );
+      if (uploadedFiles.length > 0) {
+        console.log(`Found ${uploadedFiles.length} photos in uploads directory`);
         
-        if (!existingPhoto) {
-          // Get default collection (All Photos)
-          const defaultCollection = Array.from(this.collections.values()).find(
-            c => c.name === "All Photos"
-          );
-          
-          // Try to extract photo metadata from a JSON file if it exists
-          const metadataPath = path.join(uploadsDir, `${fileName}.metadata.json`);
-          let title = "Uploaded Photo";
-          let description = "Uploaded by user";
-          let isLiked = false;
-          let collectionId = defaultCollection?.id ?? 1;
-          
-          // If metadata file exists, use it to restore title and other properties
-          if (fs.existsSync(metadataPath)) {
-            try {
-              const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
-              title = metadata.title || title;
-              description = metadata.description || description;
-              isLiked = metadata.isLiked || isLiked;
-              collectionId = metadata.collectionId || collectionId;
-            } catch (err) {
-              console.error(`Error reading metadata for ${fileName}:`, err);
-            }
-          }
-          
-          // Create a new photo entry
-          const uploadDate = this.extractDateFromFileName(fileName) || new Date();
-          const photo: Photo = {
-            id: this.photoId++,
-            title: title,
-            description: description,
-            fileName: fileName,
-            fileType: this.getFileType(fileName),
-            filePath: `/uploads/${fileName}`,
-            isLiked: isLiked,
-            collectionId: collectionId,
-            userId: 1, // Default user
-            uploadedAt: uploadDate
-          };
-          
-          this.photos.set(photo.id, photo);
-          console.log(`Loaded user upload: ${fileName}`);
+        // Get default user
+        const defaultUser = await this.getUserByUsername("demo_user");
+        if (!defaultUser) {
+          console.error("Default user not found, cannot scan uploads directory");
+          return;
         }
-      });
+        
+        // Get default collection
+        const allCollections = await this.getCollections(defaultUser.id);
+        const defaultCollection = allCollections.find(c => c.name === "All Photos") || allCollections[0];
+        if (!defaultCollection) {
+          console.error("Default collection not found, cannot scan uploads directory");
+          return;
+        }
+        
+        for (const fileName of uploadedFiles) {
+          // Check if photo already exists in database
+          const filePath = `/uploads/${fileName}`;
+          const existingPhotos = await db.select().from(photos).where(eq(photos.filePath, filePath));
+          
+          if (existingPhotos.length === 0) {
+            const uploadDate = this.extractDateFromFileName(fileName) || new Date();
+            const fileType = this.getFileType(fileName);
+            const stats = fs.statSync(path.join(uploadsDir, fileName));
+            
+            // Try to extract photo metadata from a JSON file if it exists
+            const metadataPath = path.join(uploadsDir, `${fileName}.metadata.json`);
+            let title = "Uploaded Photo";
+            let description = "Uploaded by user";
+            let isLiked = false;
+            let collectionId = defaultCollection.id;
+            
+            // If metadata file exists, use it to restore title and other properties
+            if (fs.existsSync(metadataPath)) {
+              try {
+                const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
+                title = metadata.title || title;
+                description = metadata.description || description;
+                isLiked = metadata.isLiked || isLiked;
+                collectionId = metadata.collectionId || collectionId;
+              } catch (err) {
+                console.error(`Error reading metadata for ${fileName}:`, err);
+              }
+            }
+            
+            // Create photo in database
+            await this.createPhoto({
+              title,
+              description,
+              fileName,
+              fileType,
+              filePath,
+              isLiked,
+              userId: defaultUser.id,
+              collectionId,
+              uploadedAt: uploadDate
+            });
+            
+            console.log(`Added photo to database: ${fileName}`);
+          }
+        }
+      }
     } catch (error) {
       console.error("Error scanning uploads directory:", error);
     }
@@ -153,43 +183,31 @@ export class MemStorage implements IStorage {
         return 'image/jpeg'; // Default fallback
     }
   }
-
-  // Initialize default collections
-  private initializeDefaultCollections() {
-    const defaultUser: User = { 
-      id: this.userId++, 
-      username: "demo_user", 
-      password: "password" 
-    };
-    this.users.set(defaultUser.id, defaultUser);
-
-    const collections: InsertCollection[] = [
-      { name: "All Photos", description: "Default collection for all photos", type: "custom", userId: defaultUser.id },
-      { name: "Nature", description: "Beautiful nature scenes", type: "nature", userId: defaultUser.id },
-      { name: "Travels", description: "Adventure travel photos", type: "travels", userId: defaultUser.id },
-      { name: "Favorites", description: "My favorite photos", type: "favorites", userId: defaultUser.id },
-    ];
-
-    collections.forEach(col => {
-      // Ensure all required fields are present
-      const collection: Collection = {
-        id: this.collectionId++,
-        name: col.name,
-        description: col.description || null,
-        type: col.type || "custom",
-        userId: col.userId || 1,
-        createdAt: new Date()
-      };
-      this.collections.set(collection.id, collection);
-    });
+  
+  private async initializeDefaultCollections() {
+    try {
+      const defaultUser = await this.getUserByUsername("demo_user");
+      if (!defaultUser) {
+        throw new Error("Default user not found when creating collections");
+      }
+      
+      const collections: InsertCollection[] = [
+        { name: "All Photos", description: "Default collection for all photos", type: "custom", userId: defaultUser.id },
+        { name: "Nature", description: "Beautiful nature scenes", type: "nature", userId: defaultUser.id },
+        { name: "Travels", description: "Adventure travel photos", type: "travels", userId: defaultUser.id },
+        { name: "Favorites", description: "My favorite photos", type: "favorites", userId: defaultUser.id },
+      ];
+      
+      for (const col of collections) {
+        await this.createCollection(col);
+      }
+      
+      console.log("Created default collections");
+    } catch (error) {
+      console.error("Error creating default collections:", error);
+    }
   }
-
-  // Initialize default photos with stock image data
-  private initializeDefaultPhotos() {
-    // Nothing to initialize since all default photos have been removed as requested
-    // This method is kept for future extensions if needed
-  }
-
+  
   // Helper to save metadata for a photo
   private savePhotoMetadata(photo: Photo) {
     try {
@@ -206,117 +224,80 @@ export class MemStorage implements IStorage {
       console.error(`Error saving metadata for photo ${photo.id}:`, error);
     }
   }
-
+  
   // User operations
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const result = await db.select().from(users).where(eq(users.id, id));
+    return result[0];
   }
-
+  
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const result = await db.select().from(users).where(eq(users.username, username));
+    return result[0];
   }
-
+  
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.userId++;
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+    const result = await db.insert(users).values(insertUser).returning();
+    return result[0];
   }
   
   // Collection operations
   async getCollections(userId: number): Promise<Collection[]> {
-    return Array.from(this.collections.values()).filter(
-      (collection) => collection.userId === userId,
-    );
+    return await db.select().from(collections).where(eq(collections.userId, userId));
   }
   
   async getCollection(id: number): Promise<Collection | undefined> {
-    return this.collections.get(id);
+    const result = await db.select().from(collections).where(eq(collections.id, id));
+    return result[0];
   }
   
   async createCollection(insertCollection: InsertCollection): Promise<Collection> {
-    const id = this.collectionId++;
-    const now = new Date();
-    
-    // Ensure all required fields are present with defaults if needed
-    const collection: Collection = { 
-      ...insertCollection, 
-      id,
-      name: insertCollection.name,
-      type: insertCollection.type || "custom",
-      description: insertCollection.description || null,
-      userId: insertCollection.userId || 1,
-      createdAt: now 
-    };
-    
-    this.collections.set(id, collection);
-    return collection;
+    const result = await db.insert(collections).values({
+      ...insertCollection,
+      createdAt: new Date()
+    }).returning();
+    return result[0];
   }
   
   async updateCollection(id: number, collectionUpdate: Partial<InsertCollection>): Promise<Collection | undefined> {
-    const collection = this.collections.get(id);
-    if (!collection) return undefined;
-    
-    // Ensure we maintain the required types
-    const updatedCollection: Collection = {
-      ...collection,
-      name: collectionUpdate.name || collection.name,
-      type: collectionUpdate.type || collection.type,
-      description: collectionUpdate.description !== undefined ? collectionUpdate.description : collection.description,
-      userId: collectionUpdate.userId !== undefined ? collectionUpdate.userId : collection.userId,
-      id: collection.id,
-      createdAt: collection.createdAt
-    };
-    
-    this.collections.set(id, updatedCollection);
-    return updatedCollection;
+    const result = await db.update(collections)
+      .set(collectionUpdate)
+      .where(eq(collections.id, id))
+      .returning();
+    return result[0];
   }
   
   async deleteCollection(id: number): Promise<boolean> {
-    return this.collections.delete(id);
+    const result = await db.delete(collections).where(eq(collections.id, id)).returning();
+    return result.length > 0;
   }
   
   // Photo operations
   async getPhotos(userId: number, collectionId?: number): Promise<Photo[]> {
-    return Array.from(this.photos.values())
-      .filter((photo) => {
-        if (photo.userId !== userId) return false;
-        if (collectionId && photo.collectionId !== collectionId) return false;
-        return true;
-      })
-      .sort((a, b) => {
-        const dateA = a.uploadedAt instanceof Date ? a.uploadedAt : new Date(a.uploadedAt || 0);
-        const dateB = b.uploadedAt instanceof Date ? b.uploadedAt : new Date(b.uploadedAt || 0);
-        return dateB.getTime() - dateA.getTime();
-      });
+    let query = db.select().from(photos).where(eq(photos.userId, userId));
+    
+    if (collectionId) {
+      query = query.where(eq(photos.collectionId, collectionId));
+    }
+    
+    // Sort by uploadedAt in descending order
+    const result = await query.orderBy(desc(photos.uploadedAt));
+    return result;
   }
   
   async getPhoto(id: number): Promise<Photo | undefined> {
-    return this.photos.get(id);
+    const result = await db.select().from(photos).where(eq(photos.id, id));
+    return result[0];
   }
   
   async createPhoto(insertPhoto: InsertPhoto): Promise<Photo> {
-    const id = this.photoId++;
-    const now = new Date();
+    const result = await db.insert(photos).values({
+      ...insertPhoto,
+      uploadedAt: insertPhoto.uploadedAt || new Date(),
+      isLiked: insertPhoto.isLiked || false
+    }).returning();
     
-    // Ensure all required fields are present with defaults if needed
-    const photo: Photo = { 
-      ...insertPhoto, 
-      id,
-      title: insertPhoto.title,
-      fileName: insertPhoto.fileName,
-      fileType: insertPhoto.fileType,
-      filePath: insertPhoto.filePath,
-      description: insertPhoto.description || null,
-      userId: insertPhoto.userId || 1,
-      isLiked: insertPhoto.isLiked || false,
-      collectionId: insertPhoto.collectionId || 1,
-      uploadedAt: now 
-    };
-    
-    this.photos.set(id, photo);
+    const photo = result[0];
     
     // Save metadata to a JSON file to persist title and other information across restarts
     this.savePhotoMetadata(photo);
@@ -325,64 +306,61 @@ export class MemStorage implements IStorage {
   }
   
   async updatePhoto(id: number, photoUpdate: Partial<InsertPhoto>): Promise<Photo | undefined> {
-    const photo = this.photos.get(id);
-    if (!photo) return undefined;
+    const result = await db.update(photos)
+      .set(photoUpdate)
+      .where(eq(photos.id, id))
+      .returning();
     
-    // Ensure we maintain the required types
-    const updatedPhoto: Photo = {
-      ...photo,
-      title: photoUpdate.title || photo.title,
-      fileName: photoUpdate.fileName || photo.fileName,
-      fileType: photoUpdate.fileType || photo.fileType,
-      filePath: photoUpdate.filePath || photo.filePath,
-      description: photoUpdate.description !== undefined ? photoUpdate.description : photo.description,
-      userId: photoUpdate.userId !== undefined ? photoUpdate.userId : photo.userId,
-      isLiked: photoUpdate.isLiked !== undefined ? photoUpdate.isLiked : photo.isLiked,
-      collectionId: photoUpdate.collectionId !== undefined ? photoUpdate.collectionId : photo.collectionId,
-      id: photo.id,
-      uploadedAt: photo.uploadedAt
-    };
+    const photo = result[0];
+    if (photo) {
+      // Save updated metadata
+      this.savePhotoMetadata(photo);
+    }
     
-    this.photos.set(id, updatedPhoto);
-    
-    // Save updated metadata
-    this.savePhotoMetadata(updatedPhoto);
-    
-    return updatedPhoto;
+    return photo;
   }
   
   async deletePhoto(id: number): Promise<boolean> {
-    const photo = this.photos.get(id);
-    if (photo) {
-      // Try to delete metadata file if it exists
-      try {
-        const uploadsDir = path.join(process.cwd(), "uploads");
-        const metadataPath = path.join(uploadsDir, `${photo.fileName}.metadata.json`);
-        if (fs.existsSync(metadataPath)) {
-          fs.unlinkSync(metadataPath);
-        }
-      } catch (error) {
-        console.error(`Error deleting metadata for photo ${id}:`, error);
+    // Get photo information
+    const photo = await this.getPhoto(id);
+    if (!photo) return false;
+    
+    // Delete metadata file if it exists
+    try {
+      const uploadsDir = path.join(process.cwd(), "uploads");
+      const metadataPath = path.join(uploadsDir, `${photo.fileName}.metadata.json`);
+      if (fs.existsSync(metadataPath)) {
+        fs.unlinkSync(metadataPath);
       }
+    } catch (error) {
+      console.error(`Error deleting metadata for photo ${id}:`, error);
     }
-    return this.photos.delete(id);
+    
+    // Delete from database
+    const result = await db.delete(photos).where(eq(photos.id, id)).returning();
+    return result.length > 0;
   }
   
   async toggleLikePhoto(id: number): Promise<Photo | undefined> {
-    const photo = this.photos.get(id);
+    // Get current photo to check liked status
+    const photo = await this.getPhoto(id);
     if (!photo) return undefined;
     
-    const updatedPhoto: Photo = {
-      ...photo,
-      isLiked: !photo.isLiked,
-    };
-    this.photos.set(id, updatedPhoto);
+    // Toggle the liked status
+    const result = await db.update(photos)
+      .set({ isLiked: !photo.isLiked })
+      .where(eq(photos.id, id))
+      .returning();
     
-    // Save updated metadata
-    this.savePhotoMetadata(updatedPhoto);
+    const updatedPhoto = result[0];
+    if (updatedPhoto) {
+      // Save updated metadata
+      this.savePhotoMetadata(updatedPhoto);
+    }
     
     return updatedPhoto;
   }
 }
 
-export const storage = new MemStorage();
+// Create and export the storage instance
+export const storage = new DbStorage();
