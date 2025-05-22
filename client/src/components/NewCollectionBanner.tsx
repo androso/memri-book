@@ -15,10 +15,10 @@ export default function NewCollectionBanner({ onCreateCollection }: NewCollectio
         <div className="relative z-10 flex flex-col md:flex-row items-center justify-between">
           <div className="mb-6 md:mb-0 md:mr-8">
             <h2 className="font-quicksand font-bold text-2xl md:text-3xl text-[#4A4A4A] mb-3">
-              Create a New Collection
+              Record a New Date
             </h2>
             <p className="text-[#4A4A4A] max-w-md">
-              Organize your magical moments into themed collections. Perfect for trips, seasons, or special occasions.
+              Save the memories from our special moments together. Add photos and notes from our latest adventure.
             </p>
           </div>
           <HandDrawn>
@@ -26,7 +26,7 @@ export default function NewCollectionBanner({ onCreateCollection }: NewCollectio
               className="bg-[#9C7178] hover:bg-opacity-90 text-white font-quicksand text-lg"
               onClick={onCreateCollection}
             >
-              <Plus className="mr-2 h-4 w-4" /> New Collection
+              <Plus className="mr-2 h-4 w-4" /> New Date
             </Button>
           </HandDrawn>
         </div>

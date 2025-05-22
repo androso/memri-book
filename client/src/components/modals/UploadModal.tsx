@@ -88,14 +88,14 @@ export default function UploadModal({ isOpen, onClose, collections }: UploadModa
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.photos] });
       toast({
-        title: "Photo uploaded",
-        description: "Your photo has been successfully uploaded.",
+        title: "Memory saved",
+        description: "Your photo memory has been successfully added.",
       });
       handleClose();
     },
     onError: (error) => {
       toast({
-        title: "Upload failed",
+        title: "Save failed",
         description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });
@@ -124,7 +124,7 @@ export default function UploadModal({ isOpen, onClose, collections }: UploadModa
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="font-quicksand font-bold text-2xl text-[#4A4A4A]">
-            Upload New Photo
+            Add a Memory
           </DialogTitle>
         </DialogHeader>
         
@@ -139,14 +139,14 @@ export default function UploadModal({ isOpen, onClose, collections }: UploadModa
                 <input {...getInputProps()} />
                 <CloudUpload className="h-12 w-12 text-[#88B9B0] mx-auto mb-3" />
                 <p className="text-[#4A4A4A] mb-2">
-                  {isDragActive ? "Drop your photo here..." : "Drag and drop your photo here"}
+                  {isDragActive ? "Drop your memory here..." : "Drag and drop a photo from our date"}
                 </p>
                 <p className="text-sm text-gray-500 mb-4">or</p>
                 <Button 
                   type="button" 
                   className="bg-[#88B9B0] hover:bg-opacity-90 text-white font-quicksand"
                 >
-                  Browse Files
+                  Choose Photo
                 </Button>
               </div>
             </HandDrawn>
@@ -173,7 +173,7 @@ export default function UploadModal({ isOpen, onClose, collections }: UploadModa
           
           <div className="space-y-2">
             <Label htmlFor="title" className="font-quicksand font-medium text-[#4A4A4A]">
-              Title
+              Moment Title
             </Label>
             <HandDrawn>
               <Input 
@@ -181,14 +181,14 @@ export default function UploadModal({ isOpen, onClose, collections }: UploadModa
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="w-full px-4 py-2 bg-white border border-[#E6B89C] font-lato"
-                placeholder="Enter a title for your photo"
+                placeholder="Give this moment a name"
               />
             </HandDrawn>
           </div>
           
           <div className="space-y-2">
             <Label htmlFor="description" className="font-quicksand font-medium text-[#4A4A4A]">
-              Description
+              Your Memory
             </Label>
             <HandDrawn>
               <Textarea 
@@ -196,7 +196,7 @@ export default function UploadModal({ isOpen, onClose, collections }: UploadModa
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full px-4 py-2 bg-white border border-[#E6B89C] font-lato"
-                placeholder="Add a description (optional)"
+                placeholder="Write what made this moment special..."
                 rows={3}
               />
             </HandDrawn>
@@ -204,12 +204,12 @@ export default function UploadModal({ isOpen, onClose, collections }: UploadModa
           
           <div className="space-y-2">
             <Label htmlFor="collection" className="font-quicksand font-medium text-[#4A4A4A]">
-              Collection
+              Which Date?
             </Label>
             <HandDrawn>
               <Select value={collectionId} onValueChange={setCollectionId}>
                 <SelectTrigger className="w-full px-4 py-2 bg-white border border-[#E6B89C] text-[#4A4A4A] font-lato">
-                  <SelectValue placeholder="Choose a collection" />
+                  <SelectValue placeholder="Select which date this is from" />
                 </SelectTrigger>
                 <SelectContent>
                   {collections.map(collection => (
@@ -217,7 +217,7 @@ export default function UploadModal({ isOpen, onClose, collections }: UploadModa
                       {collection.name}
                     </SelectItem>
                   ))}
-                  <SelectItem value="new">Create New Collection...</SelectItem>
+                  <SelectItem value="new">Add a New Date...</SelectItem>
                 </SelectContent>
               </Select>
             </HandDrawn>
@@ -238,7 +238,7 @@ export default function UploadModal({ isOpen, onClose, collections }: UploadModa
               onClick={handleSubmit}
               disabled={!file || !title || !collectionId || uploadMutation.isPending}
             >
-              {uploadMutation.isPending ? 'Uploading...' : 'Upload Photo'}
+              {uploadMutation.isPending ? 'Saving...' : 'Save Memory'}
             </Button>
           </HandDrawn>
         </DialogFooter>

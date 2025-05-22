@@ -41,7 +41,7 @@ export default function Header({ onUploadClick }: HeaderProps) {
               <Camera className="text-white" size={24} />
             </HandDrawn>
           </motion.div>
-          <h1 className="font-quicksand font-bold text-2xl md:text-3xl text-[#9C7178]">Ghibli Memories</h1>
+          <h1 className="font-quicksand font-bold text-2xl md:text-3xl text-[#9C7178]">Our Date Gallery</h1>
         </div>
         <div>
           <HandDrawn>
@@ -58,15 +58,15 @@ export default function Header({ onUploadClick }: HeaderProps) {
       {/* Hero section */}
       <div className="container mx-auto px-4 pt-6 pb-12 md:pb-20 text-center relative">
         <h2 className="font-quicksand font-bold text-3xl md:text-4xl lg:text-5xl mb-4 text-[#4A4A4A]">
-          Capture Your Magical Moments
+          Our Journey Together
         </h2>
         <p className="text-lg max-w-2xl mx-auto mb-8">
-          Create whimsical photo collections inspired by the enchanting world of Studio Ghibli.
+          Relive our special moments with photos, stories, and memories from each date we've shared.
         </p>
         <div className="flex flex-wrap justify-center gap-4">
           <HandDrawn>
             <Button className="bg-[#88B9B0] hover:bg-opacity-90 text-white px-6 py-6 font-quicksand text-lg">
-              <BookOpen className="mr-2 h-5 w-5" /> My Albums
+              <BookOpen className="mr-2 h-5 w-5" /> Our Dates
             </Button>
           </HandDrawn>
           <HandDrawn>
@@ -74,7 +74,7 @@ export default function Header({ onUploadClick }: HeaderProps) {
               variant="outline" 
               className="bg-white border-2 border-[#88B9B0] hover:bg-[#88B9B0] hover:bg-opacity-10 text-[#88B9B0] px-6 py-6 font-quicksand text-lg"
             >
-              <Compass className="mr-2 h-5 w-5" /> Explore
+              <Compass className="mr-2 h-5 w-5" /> Add Memory
             </Button>
           </HandDrawn>
         </div>

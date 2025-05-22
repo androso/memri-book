@@ -21,24 +21,24 @@ export default function CollectionModal({ isOpen, onClose }: CollectionModalProp
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
-  // Create collection mutation
+  // Create date entry mutation
   const createMutation = useMutation({
     mutationFn: () => apiRequest("POST", API_ENDPOINTS.collections, {
       name,
       description,
-      type: "custom"
+      type: "date"
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.collections] });
       toast({
-        title: "Collection created",
-        description: "Your new collection has been successfully created.",
+        title: "Date added",
+        description: "Your new date has been successfully added to your gallery.",
       });
       handleClose();
     },
     onError: (error) => {
       toast({
-        title: "Failed to create collection",
+        title: "Failed to add date",
         description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
       });
@@ -48,8 +48,8 @@ export default function CollectionModal({ isOpen, onClose }: CollectionModalProp
   const handleSubmit = () => {
     if (!name.trim()) {
       toast({
-        title: "Collection name required",
-        description: "Please provide a name for your collection.",
+        title: "Date name required",
+        description: "Please provide a name for this date memory.",
         variant: "destructive",
       });
       return;
@@ -68,14 +68,14 @@ export default function CollectionModal({ isOpen, onClose }: CollectionModalProp
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="font-quicksand font-bold text-2xl text-[#4A4A4A]">
-            Create New Collection
+            Add New Date
           </DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label htmlFor="collection-name" className="font-quicksand font-medium text-[#4A4A4A]">
-              Collection Name
+              Date Name
             </Label>
             <HandDrawn>
               <Input 
@@ -83,14 +83,14 @@ export default function CollectionModal({ isOpen, onClose }: CollectionModalProp
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full px-4 py-2 bg-white border border-[#E6B89C] font-lato"
-                placeholder="Enter a name for your collection"
+                placeholder="E.g., First Beach Trip, Pizza Night, Museum Visit"
               />
             </HandDrawn>
           </div>
           
           <div className="space-y-2">
             <Label htmlFor="collection-description" className="font-quicksand font-medium text-[#4A4A4A]">
-              Description
+              Your Thoughts
             </Label>
             <HandDrawn>
               <Textarea 
@@ -98,7 +98,7 @@ export default function CollectionModal({ isOpen, onClose }: CollectionModalProp
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full px-4 py-2 bg-white border border-[#E6B89C] font-lato"
-                placeholder="Add a description (optional)"
+                placeholder="Write your memories about this date..."
                 rows={3}
               />
             </HandDrawn>
@@ -119,7 +119,7 @@ export default function CollectionModal({ isOpen, onClose }: CollectionModalProp
               onClick={handleSubmit}
               disabled={!name.trim() || createMutation.isPending}
             >
-              {createMutation.isPending ? 'Creating...' : 'Create Collection'}
+              {createMutation.isPending ? 'Saving...' : 'Save Date'}
             </Button>
           </HandDrawn>
         </DialogFooter>

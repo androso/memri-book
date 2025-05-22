@@ -4,7 +4,6 @@ import Header from "@/components/Header";
 import CollectionFilter from "@/components/CollectionFilter";
 import PhotoGallery from "@/components/PhotoGallery";
 import NewCollectionBanner from "@/components/NewCollectionBanner";
-import Footer from "@/components/Footer";
 import UploadModal from "@/components/modals/UploadModal";
 import CollectionModal from "@/components/modals/CollectionModal";
 import { API_ENDPOINTS } from "@/lib/constants";
@@ -18,12 +17,12 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState("newest");
 
-  // Fetch collections
+  // Fetch date collections
   const { data: collections = [] } = useQuery<Collection[]>({
     queryKey: [API_ENDPOINTS.collections],
   });
 
-  // Fetch photos based on active collection
+  // Fetch photos based on active date
   const { data: photos = [], isLoading: photosLoading } = useQuery<Photo[]>({
     queryKey: [
       activeCollection === "all" 
@@ -43,16 +42,16 @@ export default function Home() {
   // Sort photos based on sort order
   const sortedPhotos = [...filteredPhotos].sort((a, b) => {
     if (sortOrder === "newest") {
-      return new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime();
+      return new Date(b.uploadedAt || 0).getTime() - new Date(a.uploadedAt || 0).getTime();
     } else if (sortOrder === "oldest") {
-      return new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime();
+      return new Date(a.uploadedAt || 0).getTime() - new Date(b.uploadedAt || 0).getTime();
     } else if (sortOrder === "name") {
       return a.title.localeCompare(b.title);
     }
     return 0;
   });
 
-  // Handle collection change
+  // Handle date selection change
   const handleCollectionChange = (collectionId: string | number) => {
     setActiveCollection(collectionId);
   };
@@ -84,7 +83,6 @@ export default function Home() {
         onCreateCollection={() => setIsCollectionModalOpen(true)} 
       />
       
-      <Footer />
       
       {isUploadModalOpen && (
         <UploadModal 

@@ -27,7 +27,7 @@ export default function CollectionFilter({
   return (
     <section className="container mx-auto px-4 py-8">
       <div className="flex flex-wrap items-center justify-between mb-6">
-        <h2 className="font-quicksand font-bold text-2xl text-[#4A4A4A]">My Collections</h2>
+        <h2 className="font-quicksand font-bold text-2xl text-[#4A4A4A]">Our Dates</h2>
         
         <div className="flex flex-wrap gap-2 mt-4 md:mt-0">
           <HandDrawn>
@@ -38,7 +38,7 @@ export default function CollectionFilter({
                 : "bg-white border border-[#88B9B0] text-[#88B9B0] font-quicksand"}
               onClick={() => onCollectionChange("all")}
             >
-              All Photos
+              All Memories
             </Button>
           </HandDrawn>
           
@@ -65,7 +65,7 @@ export default function CollectionFilter({
               <Search className="absolute left-3 top-3 text-[#E6B89C]" size={16} />
               <Input 
                 type="text" 
-                placeholder="Search photos..." 
+                placeholder="Search our moments..." 
                 className="pl-10 pr-4 py-2 bg-white border border-[#E6B89C] font-lato"
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
@@ -82,8 +82,8 @@ export default function CollectionFilter({
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="newest">Newest</SelectItem>
-                <SelectItem value="oldest">Oldest</SelectItem>
+                <SelectItem value="newest">Most Recent</SelectItem>
+                <SelectItem value="oldest">First Dates</SelectItem>
                 <SelectItem value="name">Name (A-Z)</SelectItem>
               </SelectContent>
             </Select>
