@@ -3,30 +3,10 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertCollectionSchema, insertPhotoSchema } from "@shared/schema";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 
-// Set up multer for file uploads
-const UPLOADS_DIR = path.join(process.cwd(), "uploads");
-
-// Create uploads directory if it doesn't exist
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
-
-const storage_config = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, UPLOADS_DIR);
-  },
-  filename: (_req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
-  }
-});
-
+// Set up multer for memory storage (for object storage)
 const upload = multer({ 
   storage: storage_config,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit

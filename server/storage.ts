@@ -82,7 +82,8 @@ export class DbStorage implements IStorage {
 
   async getPhotoUrl(objectKey: string): Promise<string> {
     try {
-      return await this.objectStorage.getPublicUrl(objectKey);
+      // For Replit Object Storage, we can construct the public URL directly
+      return `https://storage.replit.com/v1/object-storage/public/${objectKey}`;
     } catch (error) {
       console.error("Error getting photo URL:", error);
       throw new Error("Failed to get photo URL");
@@ -155,22 +156,7 @@ export class DbStorage implements IStorage {
     }
   }
   
-  // Helper to save metadata for a photo
-  private savePhotoMetadata(photo: Photo) {
-    try {
-      const uploadsDir = path.join(process.cwd(), "uploads");
-      const metadataPath = path.join(uploadsDir, `${photo.fileName}.metadata.json`);
-      const metadata = {
-        title: photo.title,
-        description: photo.description,
-        isLiked: photo.isLiked,
-        collectionId: photo.collectionId
-      };
-      fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
-    } catch (error) {
-      console.error(`Error saving metadata for photo ${photo.id}:`, error);
-    }
-  }
+  // Metadata is now stored in the database, no need for separate files
   
   // User operations
   async getUser(id: number): Promise<User | undefined> {
@@ -221,15 +207,17 @@ export class DbStorage implements IStorage {
   
   // Photo operations
   async getPhotos(userId: number, collectionId?: number): Promise<Photo[]> {
-    let query = db.select().from(photos).where(eq(photos.userId, userId));
-    
     if (collectionId) {
-      query = query.where(eq(photos.collectionId, collectionId));
+      const result = await db.select().from(photos)
+        .where(and(eq(photos.userId, userId), eq(photos.collectionId, collectionId)))
+        .orderBy(desc(photos.uploadedAt));
+      return result;
+    } else {
+      const result = await db.select().from(photos)
+        .where(eq(photos.userId, userId))
+        .orderBy(desc(photos.uploadedAt));
+      return result;
     }
-    
-    // Sort by uploadedAt in descending order
-    const result = await query.orderBy(desc(photos.uploadedAt));
-    return result;
   }
   
   async getPhoto(id: number): Promise<Photo | undefined> {
@@ -240,15 +228,10 @@ export class DbStorage implements IStorage {
   async createPhoto(insertPhoto: InsertPhoto): Promise<Photo> {
     const result = await db.insert(photos).values({
       ...insertPhoto,
-      uploadedAt: insertPhoto.uploadedAt || new Date(),
       isLiked: insertPhoto.isLiked || false
     }).returning();
     
     const photo = result[0];
-    
-    // Save metadata to a JSON file to persist title and other information across restarts
-    this.savePhotoMetadata(photo);
-    
     return photo;
   }
   
@@ -258,13 +241,7 @@ export class DbStorage implements IStorage {
       .where(eq(photos.id, id))
       .returning();
     
-    const photo = result[0];
-    if (photo) {
-      // Save updated metadata
-      this.savePhotoMetadata(photo);
-    }
-    
-    return photo;
+    return result[0];
   }
   
   async deletePhoto(id: number): Promise<boolean> {
@@ -272,16 +249,8 @@ export class DbStorage implements IStorage {
     const photo = await this.getPhoto(id);
     if (!photo) return false;
     
-    // Delete metadata file if it exists
-    try {
-      const uploadsDir = path.join(process.cwd(), "uploads");
-      const metadataPath = path.join(uploadsDir, `${photo.fileName}.metadata.json`);
-      if (fs.existsSync(metadataPath)) {
-        fs.unlinkSync(metadataPath);
-      }
-    } catch (error) {
-      console.error(`Error deleting metadata for photo ${id}:`, error);
-    }
+    // Delete from object storage
+    await this.deletePhotoFromStorage(photo.filePath);
     
     // Delete from database
     const result = await db.delete(photos).where(eq(photos.id, id)).returning();
@@ -299,13 +268,7 @@ export class DbStorage implements IStorage {
       .where(eq(photos.id, id))
       .returning();
     
-    const updatedPhoto = result[0];
-    if (updatedPhoto) {
-      // Save updated metadata
-      this.savePhotoMetadata(updatedPhoto);
-    }
-    
-    return updatedPhoto;
+    return result[0];
   }
 }
 
