@@ -51,14 +51,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/collections', async (req: Request, res: Response) => {
+  app.post('/api/collections', upload.array('photo'), async (req: Request, res: Response) => {
     try {
+      // Parse form data from req.body
+      const { name, description, type } = req.body;
+      
+      if (!name) {
+        return res.status(400).json({ message: 'Name is required' });
+      }
+      
+      // Create collection
       const data = validateSchema(insertCollectionSchema, {
-        ...req.body,
+        name,
+        description,
+        type: type || 'custom',
         userId: DEFAULT_USER_ID
       });
       
       const collection = await storage.createCollection(data);
+      
+      // Handle photo uploads if any
+      if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+        const photoTitles = Array.isArray(req.body.photoTitle) 
+          ? req.body.photoTitle 
+          : [req.body.photoTitle];
+          
+        for (let i = 0; i < req.files.length; i++) {
+          const file = req.files[i];
+          const title = photoTitles[i] || file.originalname;
+          
+          // Upload to object storage
+          const objectKey = await storage.uploadPhoto(file.buffer, file.originalname, file.mimetype);
+          
+          // Save photo to collection
+          await storage.createPhoto({
+            title,
+            fileName: file.originalname,
+            fileType: file.mimetype,
+            filePath: objectKey,
+            userId: DEFAULT_USER_ID,
+            collectionId: collection.id,
+            isLiked: false
+          });
+        }
+      }
+      
       return res.status(201).json(collection);
     } catch (error) {
       console.error('Error creating collection:', error);

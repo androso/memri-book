@@ -85,12 +85,16 @@ export default function CollectionModal({ isOpen, onClose }: CollectionModalProp
       formData.append('name', name);
       formData.append('description', description);
       formData.append('type', 'date');
-      formData.append('date', dateValue);
+      
+      // Explicitly convert date to string
+      if (dateValue) {
+        formData.append('date', dateValue);
+      }
       
       // Add photos if any
       photos.forEach((photo, index) => {
-        formData.append(`photos[${index}]`, photo.file);
-        formData.append(`photoTitles[${index}]`, photo.title);
+        formData.append(`photo`, photo.file);
+        formData.append(`photoTitle`, photo.title);
       });
       
       const response = await fetch(API_ENDPOINTS.collections, {
