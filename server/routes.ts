@@ -8,7 +8,7 @@ import { fromZodError } from "zod-validation-error";
 
 // Set up multer for memory storage (for object storage)
 const upload = multer({ 
-  storage: storage_config,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
   fileFilter: (_req, file, cb) => {
     // Accept only image files
@@ -35,8 +35,7 @@ function validateSchema<T>(schema: any, data: any): T {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Static file serving for uploads
-  app.use('/uploads', express.static(UPLOADS_DIR));
+  // Photos are now served from object storage via the /photos endpoint
   
   // Default user ID for demo (in a real app, we'd get this from auth)
   const DEFAULT_USER_ID = 1;
@@ -159,11 +158,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const file = req.file;
       
+      // Upload to object storage
+      const objectKey = await storage.uploadPhoto(file.buffer, file.originalname, file.mimetype);
+      
       const data = validateSchema(insertPhotoSchema, {
         ...req.body,
-        fileName: file.filename,
+        fileName: file.originalname,
         fileType: file.mimetype,
-        filePath: `/uploads/${file.filename}`,
+        filePath: objectKey, // Store the object key instead of file path
         userId: DEFAULT_USER_ID,
         collectionId: parseInt(req.body.collectionId) || 1, // Default to first collection if not specified
         isLiked: req.body.isLiked === 'true'
@@ -173,14 +175,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(201).json(photo);
     } catch (error) {
       console.error('Error creating photo:', error);
-      // Clean up uploaded file if there was an error
-      if (req.file) {
-        try {
-          fs.unlinkSync(req.file.path);
-        } catch (err) {
-          console.error('Error deleting file after failed upload:', err);
-        }
-      }
       return res.status(400).json({ message: error instanceof Error ? error.message : 'Failed to create photo' });
     }
   });
@@ -265,16 +259,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Not authorized to delete this photo' });
       }
 
-      // Delete the file from the filesystem
-      try {
-        const filePath = path.join(process.cwd(), photo.filePath.slice(1));
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-      } catch (err) {
-        console.error('Error deleting file:', err);
-      }
-
+      // Delete from object storage (handled in storage.deletePhoto)
       const success = await storage.deletePhoto(photoId);
       if (success) {
         return res.status(204).end();
@@ -284,6 +269,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting photo:', error);
       return res.status(500).json({ message: 'Failed to delete photo' });
+    }
+  });
+
+  // Serve photos from object storage
+  app.get('/photos/:objectKey(*)', async (req: Request, res: Response) => {
+    try {
+      const objectKey = req.params.objectKey;
+      const photoUrl = await storage.getPhotoUrl(objectKey);
+      res.redirect(photoUrl);
+    } catch (error) {
+      console.error('Error serving photo:', error);
+      res.status(404).json({ message: 'Photo not found' });
     }
   });
 
