@@ -84,9 +84,9 @@ export default function CollectionModal({ isOpen, onClose }: CollectionModalProp
       const formData = new FormData();
       formData.append('name', name);
       formData.append('description', description);
-      formData.append('type', 'date');
+      formData.append('type', 'custom'); // Changed from 'date' to 'custom'
       
-      // Explicitly convert date to string
+      // Explicitly convert date to string and store as additional metadata
       if (dateValue) {
         formData.append('date', dateValue);
       }
