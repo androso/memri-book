@@ -5,12 +5,14 @@ import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import ViewPhoto from "@/pages/view-photo";
+import ViewDateMemory from "@/pages/view-date-memory";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/photo/:id" component={ViewPhoto} />
+      <Route path="/date-memory/:id" component={ViewDateMemory} />
       <Route component={NotFound} />
     </Switch>
   );

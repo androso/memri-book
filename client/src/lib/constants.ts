@@ -42,8 +42,10 @@ export const API_ENDPOINTS = {
   photos: '/api/photos',
   collections: '/api/collections',
   photo: (id: string | number) => `/api/photos/${id}`,
+  collection: (id: string | number) => `/api/collections/${id}`,
   likePhoto: (id: string | number) => `/api/photos/${id}/like`,
-  photosByCollection: (collectionId: string | number) => `/api/photos?collectionId=${collectionId}`
+  photosByCollection: (collectionId: string | number) => `/api/photos?collectionId=${collectionId}`,
+  collectionPhotos: (collectionId: string | number) => `/api/photos?collectionId=${collectionId}`
 };
 
 // Format date in a human-readable way
