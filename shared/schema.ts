@@ -58,6 +58,7 @@ export const insertPhotoSchema = createInsertSchema(photos).pick({
   isLiked: true,
   collectionId: true,
   userId: true,
+  uploadedAt: true,
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

@@ -1,10 +1,9 @@
 import { users, collections, photos, type User, type InsertUser, type Collection, type InsertCollection, type Photo, type InsertPhoto } from "@shared/schema";
 import { format } from "date-fns";
-import fs from "fs";
-import path from "path";
 import { eq, and, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
+import { Client } from "@replit/object-storage";
 
 export interface IStorage {
   // User operations
@@ -34,7 +33,11 @@ const client = postgres(connectionString);
 const db = drizzle(client);
 
 export class DbStorage implements IStorage {
+  private objectStorage: Client;
+
   constructor() {
+    // Initialize object storage client
+    this.objectStorage = new Client();
     // Initialize database schema and data
     this.initialize();
   }
@@ -56,15 +59,8 @@ export class DbStorage implements IStorage {
         await this.initializeDefaultCollections();
       }
       
-      // Make sure the uploads directory exists
-      const uploadsDir = path.join(process.cwd(), "uploads");
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
-        console.log("Created uploads directory");
-      }
-      
-      // Scan uploads directory
-      await this.scanUploadsDirectory();
+      // Object storage is ready to use - no directory setup needed
+      console.log("Object storage initialized");
       
       console.log("Database initialization complete");
     } catch (error) {
@@ -72,82 +68,33 @@ export class DbStorage implements IStorage {
     }
   }
   
-  private async scanUploadsDirectory() {
-    const uploadsDir = path.join(process.cwd(), "uploads");
-    
+  // Object storage methods
+  async uploadPhoto(file: Buffer, fileName: string, contentType: string): Promise<string> {
     try {
-      const files = fs.readdirSync(uploadsDir);
-      
-      // Process any files that start with "photo-" (this matches multer naming pattern)
-      const uploadedFiles = files.filter(file => file.startsWith('photo-'));
-      
-      if (uploadedFiles.length > 0) {
-        console.log(`Found ${uploadedFiles.length} photos in uploads directory`);
-        
-        // Get default user
-        const defaultUser = await this.getUserByUsername("demo_user");
-        if (!defaultUser) {
-          console.error("Default user not found, cannot scan uploads directory");
-          return;
-        }
-        
-        // Get default collection
-        const allCollections = await this.getCollections(defaultUser.id);
-        const defaultCollection = allCollections.find(c => c.name === "All Photos") || allCollections[0];
-        if (!defaultCollection) {
-          console.error("Default collection not found, cannot scan uploads directory");
-          return;
-        }
-        
-        for (const fileName of uploadedFiles) {
-          // Check if photo already exists in database
-          const filePath = `/uploads/${fileName}`;
-          const existingPhotos = await db.select().from(photos).where(eq(photos.filePath, filePath));
-          
-          if (existingPhotos.length === 0) {
-            const uploadDate = this.extractDateFromFileName(fileName) || new Date();
-            const fileType = this.getFileType(fileName);
-            const stats = fs.statSync(path.join(uploadsDir, fileName));
-            
-            // Try to extract photo metadata from a JSON file if it exists
-            const metadataPath = path.join(uploadsDir, `${fileName}.metadata.json`);
-            let title = "Uploaded Photo";
-            let description = "Uploaded by user";
-            let isLiked = false;
-            let collectionId = defaultCollection.id;
-            
-            // If metadata file exists, use it to restore title and other properties
-            if (fs.existsSync(metadataPath)) {
-              try {
-                const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
-                title = metadata.title || title;
-                description = metadata.description || description;
-                isLiked = metadata.isLiked || isLiked;
-                collectionId = metadata.collectionId || collectionId;
-              } catch (err) {
-                console.error(`Error reading metadata for ${fileName}:`, err);
-              }
-            }
-            
-            // Create photo in database
-            await this.createPhoto({
-              title,
-              description,
-              fileName,
-              fileType,
-              filePath,
-              isLiked,
-              userId: defaultUser.id,
-              collectionId,
-              uploadedAt: uploadDate
-            });
-            
-            console.log(`Added photo to database: ${fileName}`);
-          }
-        }
-      }
+      const objectKey = `photos/${Date.now()}-${fileName}`;
+      await this.objectStorage.uploadFromBytes(objectKey, file);
+      return objectKey;
     } catch (error) {
-      console.error("Error scanning uploads directory:", error);
+      console.error("Error uploading photo to object storage:", error);
+      throw new Error("Failed to upload photo");
+    }
+  }
+
+  async getPhotoUrl(objectKey: string): Promise<string> {
+    try {
+      return await this.objectStorage.getPublicUrl(objectKey);
+    } catch (error) {
+      console.error("Error getting photo URL:", error);
+      throw new Error("Failed to get photo URL");
+    }
+  }
+
+  async deletePhotoFromStorage(objectKey: string): Promise<void> {
+    try {
+      await this.objectStorage.delete(objectKey);
+    } catch (error) {
+      console.error("Error deleting photo from storage:", error);
+      // Don't throw here as we still want to delete from database
     }
   }
   
@@ -168,19 +115,19 @@ export class DbStorage implements IStorage {
   }
   
   private getFileType(fileName: string): string {
-    const ext = path.extname(fileName).toLowerCase();
+    const ext = fileName.split('.').pop()?.toLowerCase() || '';
     switch (ext) {
-      case '.jpg':
-      case '.jpeg':
+      case 'jpg':
+      case 'jpeg':
         return 'image/jpeg';
-      case '.png':
+      case 'png':
         return 'image/png';
-      case '.gif':
+      case 'gif':
         return 'image/gif';
-      case '.webp':
+      case 'webp':
         return 'image/webp';
       default:
-        return 'image/jpeg'; // Default fallback
+        return 'image/jpeg';
     }
   }
   
