@@ -112,6 +112,7 @@ export default function CollectionModal({ isOpen, onClose }: CollectionModalProp
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.collections] });
+      queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.collectionsWithThumbnails] });
       toast({
         title: "Date memory added",
         description: "Your new date memory has been successfully created.",

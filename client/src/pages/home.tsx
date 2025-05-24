@@ -4,21 +4,19 @@ import Header from "@/components/Header";
 import SimplifiedFilter from "@/components/CollectionFilter";
 import DateMemoriesGallery from "@/components/DateMemoriesGallery";
 import NewCollectionBanner from "@/components/NewCollectionBanner";
-import UploadModal from "@/components/modals/UploadModal";
 import CollectionModal from "@/components/modals/CollectionModal";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { WatercolorOverlay } from "@/components/ui/watercolor-overlay";
 import { Collection } from "@shared/schema";
 
 export default function Home() {
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isCollectionModalOpen, setIsCollectionModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortOrder, setSortOrder] = useState("newest");
 
   // Fetch collections (using as date memories)
-  const { data: dateMemories = [], isLoading: dateMemoriesLoading } = useQuery<Collection[]>({
-    queryKey: [API_ENDPOINTS.collections],
+  const { data: dateMemories = [], isLoading: dateMemoriesLoading } = useQuery<(Collection & { thumbnailUrl?: string })[]>({
+    queryKey: [API_ENDPOINTS.collectionsWithThumbnails],
   });
 
   // Filter date memories based on search query
@@ -45,9 +43,7 @@ export default function Home() {
     <div className="bg-[#F4F1EA] min-h-screen relative font-lato text-[#4A4A4A]">
       <WatercolorOverlay />
       
-      <Header 
-        onUploadClick={() => setIsUploadModalOpen(true)} 
-      />
+      <Header />
       
       <SimplifiedFilter 
         searchQuery={searchQuery}
@@ -59,19 +55,12 @@ export default function Home() {
       <DateMemoriesGallery 
         dateMemories={sortedMemories}
         isLoading={dateMemoriesLoading}
+        onCreateCollection={() => setIsCollectionModalOpen(true)}
       />
       
       <NewCollectionBanner 
         onCreateCollection={() => setIsCollectionModalOpen(true)} 
       />
-      
-      {isUploadModalOpen && (
-        <UploadModal 
-          collections={dateMemories}
-          isOpen={isUploadModalOpen} 
-          onClose={() => setIsUploadModalOpen(false)} 
-        />
-      )}
       
       {isCollectionModalOpen && (
         <CollectionModal 

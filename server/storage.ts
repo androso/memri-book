@@ -3,7 +3,12 @@ import { format } from "date-fns";
 import { eq, and, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { Client } from "@replit/object-storage";
+import fs from "fs";
+import path from "path";
+import { config } from "dotenv";
+
+// Load environment variables from .env file
+config();
 
 export interface IStorage {
   // User operations
@@ -13,6 +18,7 @@ export interface IStorage {
   
   // Collection operations
   getCollections(userId: number): Promise<Collection[]>;
+  getCollectionsWithThumbnails(userId: number): Promise<(Collection & { thumbnailUrl?: string })[]>;
   getCollection(id: number): Promise<Collection | undefined>;
   createCollection(collection: InsertCollection): Promise<Collection>;
   updateCollection(id: number, collection: Partial<InsertCollection>): Promise<Collection | undefined>;
@@ -25,26 +31,40 @@ export interface IStorage {
   updatePhoto(id: number, photo: Partial<InsertPhoto>): Promise<Photo | undefined>;
   deletePhoto(id: number): Promise<boolean>;
   toggleLikePhoto(id: number): Promise<Photo | undefined>;
+  
+  // Filesystem operations
+  savePhotoToFilesystem(file: Buffer, fileName: string): Promise<string>;
+  deletePhotoFromFilesystem(filePath: string): Promise<void>;
 }
 
 // Database connection
-const connectionString = process.env.DATABASE_URL!;
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error("DATABASE_URL environment variable is not set");
+}
+
+console.log("Connecting to database with URL:", connectionString.replace(/:[^:@]*@/, ':***@')); // Log URL but hide password
 const client = postgres(connectionString);
 const db = drizzle(client);
 
 export class DbStorage implements IStorage {
-  private objectStorage: Client;
+  private uploadsDir: string;
 
   constructor() {
-    // Initialize object storage client
-    this.objectStorage = new Client();
-    // Initialize database schema and data
+    // Set up uploads directory
+    this.uploadsDir = path.join(process.cwd(), "uploads");
     this.initialize();
   }
   
   private async initialize() {
     try {
-      console.log("Initializing database...");
+      console.log("Initializing database and filesystem...");
+      
+      // Create uploads directory if it doesn't exist
+      if (!fs.existsSync(this.uploadsDir)) {
+        fs.mkdirSync(this.uploadsDir, { recursive: true });
+        console.log("Created uploads directory");
+      }
       
       // Check if default user exists
       const defaultUser = await this.getUserByUsername("demo_user");
@@ -59,76 +79,51 @@ export class DbStorage implements IStorage {
         await this.initializeDefaultCollections();
       }
       
-      // Object storage is ready to use - no directory setup needed
-      console.log("Object storage initialized");
-      
       console.log("Database initialization complete");
     } catch (error) {
       console.error("Error initializing database:", error);
     }
   }
   
-  // Object storage methods
-  async uploadPhoto(file: Buffer, fileName: string, contentType: string): Promise<string> {
+  // Filesystem operations
+  async savePhotoToFilesystem(file: Buffer, fileName: string): Promise<string> {
     try {
-      const objectKey = `photos/${Date.now()}-${fileName}`;
-      await this.objectStorage.uploadFromBytes(objectKey, file);
-      return objectKey;
+      const filePath = path.join(this.uploadsDir, fileName);
+      await fs.promises.writeFile(filePath, file);
+      return `/uploads/${fileName}`;
     } catch (error) {
-      console.error("Error uploading photo to object storage:", error);
-      throw new Error("Failed to upload photo");
+      console.error("Error saving photo to filesystem:", error);
+      throw new Error("Failed to save photo");
     }
   }
 
-  async getPhotoUrl(objectKey: string): Promise<string> {
+  async deletePhotoFromFilesystem(filePath: string): Promise<void> {
     try {
-      // For Replit Object Storage, we can construct the public URL directly
-      return `https://storage.replit.com/v1/object-storage/public/${objectKey}`;
+      // Extract filename from path like "/uploads/filename.jpg"
+      const fileName = filePath.replace('/uploads/', '');
+      const fullPath = path.join(this.uploadsDir, fileName);
+      
+      if (fs.existsSync(fullPath)) {
+        await fs.promises.unlink(fullPath);
+      }
+      
+      // Also try to delete metadata file
+      const metadataPath = `${fullPath}.metadata.json`;
+      if (fs.existsSync(metadataPath)) {
+        await fs.promises.unlink(metadataPath);
+      }
     } catch (error) {
-      console.error("Error getting photo URL:", error);
-      throw new Error("Failed to get photo URL");
-    }
-  }
-
-  async deletePhotoFromStorage(objectKey: string): Promise<void> {
-    try {
-      await this.objectStorage.delete(objectKey);
-    } catch (error) {
-      console.error("Error deleting photo from storage:", error);
+      console.error("Error deleting photo from filesystem:", error);
       // Don't throw here as we still want to delete from database
     }
   }
   
-  private extractDateFromFileName(fileName: string): Date | null {
+  private async createMetadataFile(fileName: string, metadata: any): Promise<void> {
     try {
-      // Extract timestamp from filenames like "photo-1743260503114-360974261.jpg"
-      const match = fileName.match(/photo-(\d+)-/);
-      if (match && match[1]) {
-        const timestamp = parseInt(match[1]);
-        if (!isNaN(timestamp)) {
-          return new Date(timestamp);
-        }
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  }
-  
-  private getFileType(fileName: string): string {
-    const ext = fileName.split('.').pop()?.toLowerCase() || '';
-    switch (ext) {
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'gif':
-        return 'image/gif';
-      case 'webp':
-        return 'image/webp';
-      default:
-        return 'image/jpeg';
+      const metadataPath = path.join(this.uploadsDir, `${fileName}.metadata.json`);
+      await fs.promises.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+    } catch (error) {
+      console.error("Error creating metadata file:", error);
     }
   }
   
@@ -156,8 +151,6 @@ export class DbStorage implements IStorage {
     }
   }
   
-  // Metadata is now stored in the database, no need for separate files
-  
   // User operations
   async getUser(id: number): Promise<User | undefined> {
     const result = await db.select().from(users).where(eq(users.id, id));
@@ -177,6 +170,28 @@ export class DbStorage implements IStorage {
   // Collection operations
   async getCollections(userId: number): Promise<Collection[]> {
     return await db.select().from(collections).where(eq(collections.userId, userId));
+  }
+  
+  async getCollectionsWithThumbnails(userId: number): Promise<(Collection & { thumbnailUrl?: string })[]> {
+    const userCollections = await db.select().from(collections).where(eq(collections.userId, userId));
+    
+    // For each collection, get the first photo if any
+    const collectionsWithThumbnails = await Promise.all(
+      userCollections.map(async (collection) => {
+        const firstPhoto = await db.select()
+          .from(photos)
+          .where(eq(photos.collectionId, collection.id))
+          .orderBy(desc(photos.uploadedAt))
+          .limit(1);
+        
+        return {
+          ...collection,
+          thumbnailUrl: firstPhoto.length > 0 ? firstPhoto[0].filePath : undefined
+        };
+      })
+    );
+    
+    return collectionsWithThumbnails;
   }
   
   async getCollection(id: number): Promise<Collection | undefined> {
@@ -232,6 +247,16 @@ export class DbStorage implements IStorage {
     }).returning();
     
     const photo = result[0];
+    
+    // Create metadata file for filesystem backup
+    await this.createMetadataFile(photo.fileName, {
+      title: photo.title,
+      description: photo.description,
+      isLiked: photo.isLiked,
+      collectionId: photo.collectionId,
+      uploadedAt: photo.uploadedAt
+    });
+    
     return photo;
   }
   
@@ -241,7 +266,19 @@ export class DbStorage implements IStorage {
       .where(eq(photos.id, id))
       .returning();
     
-    return result[0];
+    const photo = result[0];
+    if (photo) {
+      // Update metadata file
+      await this.createMetadataFile(photo.fileName, {
+        title: photo.title,
+        description: photo.description,
+        isLiked: photo.isLiked,
+        collectionId: photo.collectionId,
+        uploadedAt: photo.uploadedAt
+      });
+    }
+    
+    return photo;
   }
   
   async deletePhoto(id: number): Promise<boolean> {
@@ -249,8 +286,8 @@ export class DbStorage implements IStorage {
     const photo = await this.getPhoto(id);
     if (!photo) return false;
     
-    // Delete from object storage
-    await this.deletePhotoFromStorage(photo.filePath);
+    // Delete from filesystem
+    await this.deletePhotoFromFilesystem(photo.filePath);
     
     // Delete from database
     const result = await db.delete(photos).where(eq(photos.id, id)).returning();
@@ -268,7 +305,19 @@ export class DbStorage implements IStorage {
       .where(eq(photos.id, id))
       .returning();
     
-    return result[0];
+    const updatedPhoto = result[0];
+    if (updatedPhoto) {
+      // Update metadata file
+      await this.createMetadataFile(updatedPhoto.fileName, {
+        title: updatedPhoto.title,
+        description: updatedPhoto.description,
+        isLiked: updatedPhoto.isLiked,
+        collectionId: updatedPhoto.collectionId,
+        uploadedAt: updatedPhoto.uploadedAt
+      });
+    }
+    
+    return updatedPhoto;
   }
 }
 

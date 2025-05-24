@@ -41,6 +41,7 @@ export const STOCK_IMAGES = {
 export const API_ENDPOINTS = {
   photos: '/api/photos',
   collections: '/api/collections',
+  collectionsWithThumbnails: '/api/collections/with-thumbnails',
   photo: (id: string | number) => `/api/photos/${id}`,
   collection: (id: string | number) => `/api/collections/${id}`,
   likePhoto: (id: string | number) => `/api/photos/${id}/like`,

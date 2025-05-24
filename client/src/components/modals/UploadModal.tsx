@@ -110,6 +110,7 @@ export default function UploadModal({ isOpen, onClose, collections }: UploadModa
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.photos] });
+      queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.collectionsWithThumbnails] });
       toast({
         title: "Date memory saved",
         description: `${photos.length} photo${photos.length !== 1 ? 's' : ''} from your date have been added.`,

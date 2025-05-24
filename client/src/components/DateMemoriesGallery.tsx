@@ -11,29 +11,24 @@ import { queryClient } from "@/lib/queryClient";
 import { API_ENDPOINTS } from "@/lib/constants";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Extend the Collection type to include date property
+// Extend the Collection type to include date property and thumbnailUrl
 interface DateMemory extends Collection {
   date?: string;
+  thumbnailUrl?: string;
 }
 
 interface DateMemoriesGalleryProps {
-  dateMemories: Collection[];
+  dateMemories: (Collection & { thumbnailUrl?: string })[];
   isLoading: boolean;
+  onCreateCollection: () => void;
 }
 
-export default function DateMemoriesGallery({ dateMemories, isLoading }: DateMemoriesGalleryProps) {
+export default function DateMemoriesGallery({ dateMemories, isLoading, onCreateCollection }: DateMemoriesGalleryProps) {
   const [, navigate] = useLocation();
 
-  // Function to get a placeholder image when collection has no cover
-  const getPlaceholderImage = (index: number) => {
-    const placeholders = [
-      'https://images.unsplash.com/photo-1490604001847-b712b0c2f967',
-      'https://images.unsplash.com/photo-1578146165056-6e03aaae7ff5',
-      'https://images.unsplash.com/photo-1503803548695-c2a7b4a5b875',
-      'https://images.unsplash.com/photo-1434725039720-aaad6dd32dfe',
-      'https://images.unsplash.com/photo-1627483262769-04d0a1401487',
-    ];
-    return placeholders[index % placeholders.length];
+  // Get thumbnail URL - use first photo or placeholder
+  const getThumbnailUrl = (memory: Collection & { thumbnailUrl?: string }) => {
+    return memory.thumbnailUrl || 'https://placehold.co/600x400';
   };
 
   const handleMemoryClick = (memory: Collection) => {
@@ -75,7 +70,10 @@ export default function DateMemoriesGallery({ dateMemories, isLoading }: DateMem
           <p className="mb-6 text-[#4A4A4A]">
             Start creating your relationship timeline by adding your first date memory.
           </p>
-          <Button className="bg-[#E6B89C] hover:bg-[#9C7178] text-white">
+          <Button 
+            className="bg-[#E6B89C] hover:bg-[#9C7178] text-white"
+            onClick={onCreateCollection}
+          >
             Add Your First Date Memory
           </Button>
         </HandDrawn>
@@ -97,13 +95,13 @@ export default function DateMemoriesGallery({ dateMemories, isLoading }: DateMem
             >
               <div className="relative overflow-hidden" style={{ height: "220px" }}>
                 <img 
-                  src={getPlaceholderImage(index)}
+                  src={getThumbnailUrl(memory)}
                   alt={memory.name} 
                   className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
                 />
                 <div className="absolute bottom-0 right-0 bg-white bg-opacity-80 px-2 py-1 m-2 rounded text-xs flex items-center">
                   <Image size={12} className="mr-1" />
-                  <span>Multiple photos</span>
+                  <span>{memory.thumbnailUrl ? 'Has photos' : 'No photos'}</span>
                 </div>
               </div>
               <div className="p-4">

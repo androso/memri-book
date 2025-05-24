@@ -6,7 +6,13 @@ import multer from "multer";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 
-// Set up multer for memory storage (for object storage)
+// Extend Request type to include multer file properties
+interface MulterRequest extends Request {
+  file?: multer.Multer.File;
+  files?: multer.Multer.File[];
+}
+
+// Set up multer for file uploads
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
@@ -34,9 +40,15 @@ function validateSchema<T>(schema: any, data: any): T {
   }
 }
 
+// Helper function to generate unique filename
+function generateFileName(originalName: string): string {
+  const timestamp = Date.now();
+  const randomNum = Math.floor(Math.random() * 1000000000);
+  const extension = originalName.split('.').pop();
+  return `photo-${timestamp}-${randomNum}.${extension}`;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Photos are now served from object storage via the /photos endpoint
-  
   // Default user ID for demo (in a real app, we'd get this from auth)
   const DEFAULT_USER_ID = 1;
 
@@ -51,7 +63,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/collections', upload.array('photo'), async (req: Request, res: Response) => {
+  app.get('/api/collections/with-thumbnails', async (_req: Request, res: Response) => {
+    try {
+      const collections = await storage.getCollectionsWithThumbnails(DEFAULT_USER_ID);
+      return res.json(collections);
+    } catch (error) {
+      console.error('Error fetching collections with thumbnails:', error);
+      return res.status(500).json({ message: 'Failed to fetch collections with thumbnails' });
+    }
+  });
+
+  app.post('/api/collections', upload.array('photo'), async (req: MulterRequest, res: Response) => {
     try {
       // Parse form data from req.body
       const { name, description, type } = req.body;
@@ -80,15 +102,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const file = req.files[i];
           const title = photoTitles[i] || file.originalname;
           
-          // Upload to object storage
-          const objectKey = await storage.uploadPhoto(file.buffer, file.originalname, file.mimetype);
+          // Generate unique filename and save to filesystem
+          const fileName = generateFileName(file.originalname);
+          const filePath = await storage.savePhotoToFilesystem(file.buffer, fileName);
           
           // Save photo to collection
           await storage.createPhoto({
             title,
-            fileName: file.originalname,
+            fileName: fileName,
             fileType: file.mimetype,
-            filePath: objectKey,
+            filePath: filePath,
             userId: DEFAULT_USER_ID,
             collectionId: collection.id,
             isLiked: false
@@ -187,7 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/photos', upload.single('photo'), async (req: Request, res: Response) => {
+  app.post('/api/photos', upload.single('photo'), async (req: MulterRequest, res: Response) => {
     try {
       if (!req.file) {
         return res.status(400).json({ message: 'No file uploaded' });
@@ -195,14 +218,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const file = req.file;
       
-      // Upload to object storage
-      const objectKey = await storage.uploadPhoto(file.buffer, file.originalname, file.mimetype);
+      // Generate unique filename and save to filesystem
+      const fileName = generateFileName(file.originalname);
+      const filePath = await storage.savePhotoToFilesystem(file.buffer, fileName);
       
       const data = validateSchema(insertPhotoSchema, {
         ...req.body,
-        fileName: file.originalname,
+        fileName: fileName,
         fileType: file.mimetype,
-        filePath: objectKey, // Store the object key instead of file path
+        filePath: filePath,
         userId: DEFAULT_USER_ID,
         collectionId: parseInt(req.body.collectionId) || 1, // Default to first collection if not specified
         isLiked: req.body.isLiked === 'true'
@@ -296,7 +320,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: 'Not authorized to delete this photo' });
       }
 
-      // Delete from object storage (handled in storage.deletePhoto)
       const success = await storage.deletePhoto(photoId);
       if (success) {
         return res.status(204).end();
@@ -306,18 +329,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting photo:', error);
       return res.status(500).json({ message: 'Failed to delete photo' });
-    }
-  });
-
-  // Serve photos from object storage
-  app.get('/photos/:objectKey(*)', async (req: Request, res: Response) => {
-    try {
-      const objectKey = req.params.objectKey;
-      const photoUrl = await storage.getPhotoUrl(objectKey);
-      res.redirect(photoUrl);
-    } catch (error) {
-      console.error('Error serving photo:', error);
-      res.status(404).json({ message: 'Photo not found' });
     }
   });
 

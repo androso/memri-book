@@ -1,13 +1,9 @@
 import { HandDrawn } from "@/components/ui/hand-drawn";
 import { Button } from "@/components/ui/button";
-import { Camera, Plus, BookOpen, Compass } from "lucide-react";
+import { Camera, BookOpen, Compass } from "lucide-react";
 import { motion } from "framer-motion";
 
-interface HeaderProps {
-  onUploadClick: () => void;
-}
-
-export default function Header({ onUploadClick }: HeaderProps) {
+export default function Header() {
   return (
     <header className="relative overflow-hidden">
       {/* Cloud decoration */}
@@ -42,16 +38,6 @@ export default function Header({ onUploadClick }: HeaderProps) {
             </HandDrawn>
           </motion.div>
           <h1 className="font-quicksand font-bold text-2xl md:text-3xl text-[#9C7178]">Our Date Gallery</h1>
-        </div>
-        <div>
-          <HandDrawn>
-            <Button 
-              className="bg-[#E6B89C] hover:bg-[#9C7178] text-white font-quicksand"
-              onClick={onUploadClick}
-            >
-              <Plus className="mr-2 h-4 w-4" /> Upload
-            </Button>
-          </HandDrawn>
         </div>
       </nav>
 
