@@ -43,7 +43,7 @@ export default function Home() {
     <div className="bg-[#F4F1EA] min-h-screen relative font-lato text-[#4A4A4A]">
       <WatercolorOverlay />
       
-      <Header />
+      <Header onCreateCollection={() => setIsCollectionModalOpen(true)} />
       
       <SimplifiedFilter 
         searchQuery={searchQuery}
