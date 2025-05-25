@@ -216,6 +216,19 @@ export class DbStorage implements IStorage {
   }
   
   async deleteCollection(id: number): Promise<boolean> {
+    // First, get all photos in this collection
+    const collectionPhotos = await db.select().from(photos).where(eq(photos.collectionId, id));
+    
+    // Delete all photos from filesystem and database
+    for (const photo of collectionPhotos) {
+      // Delete from filesystem
+      await this.deletePhotoFromFilesystem(photo.filePath);
+      
+      // Delete from database
+      await db.delete(photos).where(eq(photos.id, photo.id));
+    }
+    
+    // Finally, delete the collection itself
     const result = await db.delete(collections).where(eq(collections.id, id)).returning();
     return result.length > 0;
   }
