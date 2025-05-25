@@ -76,6 +76,7 @@ export default function ViewDateMemory() {
         description: "The date memory has been successfully deleted.",
       });
       queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.collections] });
+      queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.collectionsWithThumbnails] });
       navigate("/");
     },
     onError: (error) => {
