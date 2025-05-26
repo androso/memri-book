@@ -264,45 +264,39 @@ export default function ViewDateMemory() {
                 alt={activePhoto.title || memory.name} 
                 className="w-full object-contain max-h-[50vh]"
               />
-              {activePhoto.title && (
-                <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-2">
-                  <p className="text-lg font-medium">{activePhoto.title}</p>
-                </div>
-              )}
+              <Button 
+                className="absolute top-4 right-4 bg-[#E6B89C] hover:bg-[#9C7178] text-white font-quicksand"
+                onClick={() => setIsUploading(!isUploading)}
+              >
+                <Plus className="mr-2 h-4 w-4" /> Upload Photos
+              </Button>
             </div>
           ) : (
-            <div className="bg-gray-100 flex items-center justify-center h-[40vh]">
+            <div className="bg-gray-100 flex items-center justify-center h-[40vh] relative">
               <div className="text-center p-8">
                 <Image className="h-16 w-16 mx-auto text-gray-400 mb-4" />
                 <p className="text-gray-500">No photos in this memory yet</p>
               </div>
+              <Button 
+                className="absolute top-4 right-4 bg-[#E6B89C] hover:bg-[#9C7178] text-white font-quicksand"
+                onClick={() => setIsUploading(!isUploading)}
+              >
+                <Plus className="mr-2 h-4 w-4" /> Upload Photos
+              </Button>
             </div>
           )}
           
           <div className="p-6">
-            <div className="flex justify-between items-start mb-2">
-              <h1 className="font-quicksand font-bold text-2xl md:text-3xl">{memory.name}</h1>
-              <div className="flex items-center text-[#9C7178]">
-                <Calendar className="h-5 w-5 mr-1" />
-                <span>{formattedDate}</span>
-              </div>
+            <h1 className="font-quicksand font-bold text-2xl md:text-3xl mb-2">{memory.name}</h1>
+            <div className="flex items-center text-[#9C7178] mb-2">
+              <Calendar className="h-5 w-5 mr-1" />
+              <span>{formattedDate}</span>
             </div>
-            
             <p className="text-lg mb-6">{memory.description}</p>
             
             {/* Upload section */}
-            <div className="mb-6 p-4 bg-[#F4F1EA] rounded-lg">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-quicksand font-medium text-lg">Add More Photos</h3>
-                <Button 
-                  className="bg-[#E6B89C] hover:bg-[#9C7178] text-white font-quicksand"
-                  onClick={() => setIsUploading(!isUploading)}
-                >
-                  <Plus className="mr-2 h-4 w-4" /> Upload Photos
-                </Button>
-              </div>
-              
-              {isUploading && (
+            {isUploading && (
+              <div className="mb-6 p-4 bg-[#F4F1EA] rounded-lg">
                 <div className="space-y-4">
                   <HandDrawn>
                     <div 
@@ -384,8 +378,8 @@ export default function ViewDateMemory() {
                     </div>
                   )}
                 </div>
-              )}
-            </div>
+              </div>
+            )}
             
             {/* Photo thumbnails */}
             {photos.length > 0 && (
