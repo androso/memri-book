@@ -48,21 +48,45 @@ export default function LoginPage() {
 
     setIsLoading(true);
     
-    // Simulate password validation delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // For now, accept any password
-    console.log("Login attempt:", { userId: selectedUser.id, userName: selectedUser.name, password });
-    
-    // Simulate successful login
-    toast({
-      title: `Welcome back, ${selectedUser.name}!`,
-      description: "You have successfully signed in to Memri.",
-    });
-    
-    setIsLoading(false);
-    // Navigate to the main app
-    navigate("/");
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: selectedUser.id,
+          password: password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast({
+          title: `Welcome back, ${selectedUser.name}!`,
+          description: "You have successfully signed in to Memri.",
+        });
+        
+        // Navigate to the main app
+        navigate("/");
+      } else {
+        toast({
+          title: "Login Failed",
+          description: data.message || "Invalid username or password",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast({
+        title: "Login Failed",
+        description: "An error occurred during login. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleBack = () => {

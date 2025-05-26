@@ -6,6 +6,10 @@ export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
+  displayName: text("display_name").notNull(),
+  profilePicture: text("profile_picture"), // URL to profile picture
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const collectionEnum = pgEnum("collection_type", [
@@ -37,9 +41,32 @@ export const photos = pgTable("photos", {
   uploadedAt: timestamp("uploaded_at").defaultNow(),
 });
 
+// Comments table for future use
+export const comments = pgTable("comments", {
+  id: serial("id").primaryKey(),
+  content: text("content").notNull(),
+  collectionId: integer("collection_id").references(() => collections.id),
+  userId: integer("user_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
+  displayName: true,
+  profilePicture: true,
+});
+
+export const updateUserSchema = createInsertSchema(users).pick({
+  displayName: true,
+  profilePicture: true,
+  password: true,
+}).partial();
+
+export const loginSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
 });
 
 export const insertCollectionSchema = createInsertSchema(collections).pick({
@@ -61,7 +88,15 @@ export const insertPhotoSchema = createInsertSchema(photos).pick({
   uploadedAt: true,
 });
 
+export const insertCommentSchema = createInsertSchema(comments).pick({
+  content: true,
+  collectionId: true,
+  userId: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
+export type UpdateUser = z.infer<typeof updateUserSchema>;
+export type LoginRequest = z.infer<typeof loginSchema>;
 export type User = typeof users.$inferSelect;
 
 export type InsertCollection = z.infer<typeof insertCollectionSchema>;
@@ -69,3 +104,6 @@ export type Collection = typeof collections.$inferSelect;
 
 export type InsertPhoto = z.infer<typeof insertPhotoSchema>;
 export type Photo = typeof photos.$inferSelect;
+
+export type InsertComment = z.infer<typeof insertCommentSchema>;
+export type Comment = typeof comments.$inferSelect;

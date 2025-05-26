@@ -1,4 +1,4 @@
-import { users, collections, photos, type User, type InsertUser, type Collection, type InsertCollection, type Photo, type InsertPhoto } from "@shared/schema";
+import { users, collections, photos, comments, type User, type InsertUser, type UpdateUser, type Collection, type InsertCollection, type Photo, type InsertPhoto, type Comment, type InsertComment } from "@shared/schema";
 import { format } from "date-fns";
 import { eq, and, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -15,6 +15,8 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, user: UpdateUser): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
   
   // Collection operations
   getCollections(userId: number): Promise<Collection[]>;
@@ -31,6 +33,12 @@ export interface IStorage {
   updatePhoto(id: number, photo: Partial<InsertPhoto>): Promise<Photo | undefined>;
   deletePhoto(id: number): Promise<boolean>;
   toggleLikePhoto(id: number): Promise<Photo | undefined>;
+  
+  // Comment operations (for future use)
+  getComments(collectionId: number): Promise<Comment[]>;
+  createComment(comment: InsertComment): Promise<Comment>;
+  updateComment(id: number, comment: Partial<InsertComment>): Promise<Comment | undefined>;
+  deleteComment(id: number): Promise<boolean>;
   
   // Filesystem operations
   savePhotoToFilesystem(file: Buffer, fileName: string): Promise<string>;
@@ -66,18 +74,8 @@ export class DbStorage implements IStorage {
         console.log("Created uploads directory");
       }
       
-      // Check if default user exists
-      const defaultUser = await this.getUserByUsername("demo_user");
-      if (!defaultUser) {
-        console.log("Creating default user...");
-        await this.createUser({
-          username: "demo_user",
-          password: "password"
-        });
-        
-        // Create default collections
-        await this.initializeDefaultCollections();
-      }
+      // Check if users exist and create them
+      await this.initializeUsers();
       
       console.log("Database initialization complete");
     } catch (error) {
@@ -127,27 +125,40 @@ export class DbStorage implements IStorage {
     }
   }
   
-  private async initializeDefaultCollections() {
+  private async initializeUsers() {
     try {
-      const defaultUser = await this.getUserByUsername("demo_user");
-      if (!defaultUser) {
-        throw new Error("Default user not found when creating collections");
+      // Import bcrypt here to avoid circular dependency
+      const bcrypt = await import("bcryptjs");
+      
+      // Check if users exist
+      const karold = await this.getUserByUsername("karold");
+      const androso = await this.getUserByUsername("androso");
+      
+      if (!karold) {
+        console.log("Creating user: karold");
+        const hashedPassword = await bcrypt.hash("karold123", 12);
+        await this.createUser({
+          username: "karold",
+          password: hashedPassword,
+          displayName: "Karold",
+          profilePicture: null
+        });
       }
       
-      const collections: InsertCollection[] = [
-        { name: "All Photos", description: "Default collection for all photos", type: "custom", userId: defaultUser.id },
-        { name: "Nature", description: "Beautiful nature scenes", type: "nature", userId: defaultUser.id },
-        { name: "Travels", description: "Adventure travel photos", type: "travels", userId: defaultUser.id },
-        { name: "Favorites", description: "My favorite photos", type: "favorites", userId: defaultUser.id },
-      ];
-      
-      for (const col of collections) {
-        await this.createCollection(col);
+      if (!androso) {
+        console.log("Creating user: androso");
+        const hashedPassword = await bcrypt.hash("androso123", 12);
+        await this.createUser({
+          username: "androso", 
+          password: hashedPassword,
+          displayName: "Androso",
+          profilePicture: null
+        });
       }
       
-      console.log("Created default collections");
+      console.log("User initialization complete");
     } catch (error) {
-      console.error("Error creating default collections:", error);
+      console.error("Error initializing users:", error);
     }
   }
   
@@ -165,6 +176,18 @@ export class DbStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const result = await db.insert(users).values(insertUser).returning();
     return result[0];
+  }
+  
+  async updateUser(id: number, userUpdate: UpdateUser): Promise<User | undefined> {
+    const result = await db.update(users)
+      .set({ ...userUpdate, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return result[0];
+  }
+  
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users);
   }
   
   // Collection operations
@@ -331,6 +354,35 @@ export class DbStorage implements IStorage {
     }
     
     return updatedPhoto;
+  }
+  
+  // Comment operations (for future use)
+  async getComments(collectionId: number): Promise<Comment[]> {
+    return await db.select().from(comments)
+      .where(eq(comments.collectionId, collectionId))
+      .orderBy(desc(comments.createdAt));
+  }
+  
+  async createComment(insertComment: InsertComment): Promise<Comment> {
+    const result = await db.insert(comments).values({
+      ...insertComment,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }).returning();
+    return result[0];
+  }
+  
+  async updateComment(id: number, commentUpdate: Partial<InsertComment>): Promise<Comment | undefined> {
+    const result = await db.update(comments)
+      .set({ ...commentUpdate, updatedAt: new Date() })
+      .where(eq(comments.id, id))
+      .returning();
+    return result[0];
+  }
+  
+  async deleteComment(id: number): Promise<boolean> {
+    const result = await db.delete(comments).where(eq(comments.id, id)).returning();
+    return result.length > 0;
   }
 }
 

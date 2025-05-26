@@ -7,12 +7,14 @@ import Home from "@/pages/home";
 import ViewPhoto from "@/pages/view-photo";
 import ViewDateMemory from "@/pages/view-date-memory";
 import LoginPage from "@/pages/login";
+import ProfilePage from "@/pages/profile";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/login" component={LoginPage} />
+      <Route path="/profile" component={ProfilePage} />
       <Route path="/photo/:id" component={ViewPhoto} />
       <Route path="/date-memory/:id" component={ViewDateMemory} />
       <Route component={NotFound} />
