@@ -6,11 +6,13 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import ViewPhoto from "@/pages/view-photo";
 import ViewDateMemory from "@/pages/view-date-memory";
+import LoginPage from "@/pages/login";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/login" component={LoginPage} />
       <Route path="/photo/:id" component={ViewPhoto} />
       <Route path="/date-memory/:id" component={ViewDateMemory} />
       <Route component={NotFound} />
