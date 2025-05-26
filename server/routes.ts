@@ -250,8 +250,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Collection not found' });
       }
 
-      // Check if user owns this collection
-      if (collection.userId !== req.user.id) {
+      // Check if user is an owner of this collection
+      const ownership = await storage.checkCollectionOwnership(collectionId, req.user.id);
+      if (!ownership) {
         return res.status(403).json({ message: 'Not authorized to access this collection' });
       }
 
@@ -278,7 +279,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Collection not found' });
       }
 
-      if (collection.userId !== req.user.id) {
+      // Check if user is an owner of this collection
+      const ownership = await storage.checkCollectionOwnership(collectionId, req.user.id);
+      if (!ownership) {
         return res.status(403).json({ message: 'Not authorized to update this collection' });
       }
 
@@ -307,7 +310,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Collection not found' });
       }
 
-      if (collection.userId !== req.user.id) {
+      // Check if user is an owner of this collection
+      const ownership = await storage.checkCollectionOwnership(collectionId, req.user.id);
+      if (!ownership) {
         return res.status(403).json({ message: 'Not authorized to delete this collection' });
       }
 

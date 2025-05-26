@@ -1,4 +1,4 @@
-import { users, collections, photos, comments, type User, type InsertUser, type UpdateUser, type Collection, type InsertCollection, type Photo, type InsertPhoto, type Comment, type InsertComment } from "@shared/schema";
+import { users, collections, collectionOwners, photos, comments, type User, type InsertUser, type UpdateUser, type Collection, type InsertCollection, type CollectionOwner, type InsertCollectionOwner, type Photo, type InsertPhoto, type Comment, type InsertComment } from "@shared/schema";
 import { format } from "date-fns";
 import { eq, and, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -25,6 +25,7 @@ export interface IStorage {
   createCollection(collection: InsertCollection): Promise<Collection>;
   updateCollection(id: number, collection: Partial<InsertCollection>): Promise<Collection | undefined>;
   deleteCollection(id: number): Promise<boolean>;
+  checkCollectionOwnership(collectionId: number, userId: number): Promise<boolean>;
   
   // Photo operations
   getPhotos(userId: number, collectionId?: number): Promise<Photo[]>;
@@ -192,11 +193,39 @@ export class DbStorage implements IStorage {
   
   // Collection operations
   async getCollections(userId: number): Promise<Collection[]> {
-    return await db.select().from(collections).where(eq(collections.userId, userId));
+    // Get collections where the user is an owner
+    const result = await db
+      .select({
+        id: collections.id,
+        name: collections.name,
+        description: collections.description,
+        type: collections.type,
+        userId: collections.userId,
+        createdAt: collections.createdAt,
+      })
+      .from(collections)
+      .innerJoin(collectionOwners, eq(collections.id, collectionOwners.collectionId))
+      .where(eq(collectionOwners.userId, userId))
+      .orderBy(desc(collections.createdAt));
+    
+    return result;
   }
   
   async getCollectionsWithThumbnails(userId: number): Promise<(Collection & { thumbnailUrl?: string })[]> {
-    const userCollections = await db.select().from(collections).where(eq(collections.userId, userId));
+    // Get collections where the user is an owner
+    const userCollections = await db
+      .select({
+        id: collections.id,
+        name: collections.name,
+        description: collections.description,
+        type: collections.type,
+        userId: collections.userId,
+        createdAt: collections.createdAt,
+      })
+      .from(collections)
+      .innerJoin(collectionOwners, eq(collections.id, collectionOwners.collectionId))
+      .where(eq(collectionOwners.userId, userId))
+      .orderBy(desc(collections.createdAt));
     
     // For each collection, get the first photo if any
     const collectionsWithThumbnails = await Promise.all(
@@ -227,7 +256,22 @@ export class DbStorage implements IStorage {
       ...insertCollection,
       createdAt: new Date()
     }).returning();
-    return result[0];
+    
+    const collection = result[0];
+    
+    // Add both users as owners of the collection
+    const allUsers = await this.getAllUsers();
+    const ownershipPromises = allUsers.map(user => 
+      db.insert(collectionOwners).values({
+        collectionId: collection.id,
+        userId: user.id,
+        createdAt: new Date()
+      })
+    );
+    
+    await Promise.all(ownershipPromises);
+    
+    return collection;
   }
   
   async updateCollection(id: number, collectionUpdate: Partial<InsertCollection>): Promise<Collection | undefined> {
@@ -251,9 +295,23 @@ export class DbStorage implements IStorage {
       await db.delete(photos).where(eq(photos.id, photo.id));
     }
     
+    // Delete collection ownership records (will cascade automatically due to foreign key constraints)
     // Finally, delete the collection itself
     const result = await db.delete(collections).where(eq(collections.id, id)).returning();
     return result.length > 0;
+  }
+
+  async checkCollectionOwnership(collectionId: number, userId: number): Promise<boolean> {
+    const ownership = await db
+      .select()
+      .from(collectionOwners)
+      .where(and(
+        eq(collectionOwners.collectionId, collectionId),
+        eq(collectionOwners.userId, userId)
+      ))
+      .limit(1);
+    
+    return ownership.length > 0;
   }
   
   // Photo operations

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, pgEnum, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -24,9 +24,18 @@ export const collections = pgTable("collections", {
   name: text("name").notNull(),
   description: text("description"),
   type: collectionEnum("type").notNull().default("custom"),
-  userId: integer("user_id").references(() => users.id),
+  userId: integer("user_id").references(() => users.id), // Keep for backward compatibility
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const collectionOwners = pgTable("collection_owners", {
+  id: serial("id").primaryKey(),
+  collectionId: integer("collection_id").notNull().references(() => collections.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uniqueCollectionUser: unique().on(table.collectionId, table.userId),
+}));
 
 export const photos = pgTable("photos", {
   id: serial("id").primaryKey(),
@@ -101,6 +110,9 @@ export type User = typeof users.$inferSelect;
 
 export type InsertCollection = z.infer<typeof insertCollectionSchema>;
 export type Collection = typeof collections.$inferSelect;
+
+export type CollectionOwner = typeof collectionOwners.$inferSelect;
+export type InsertCollectionOwner = typeof collectionOwners.$inferInsert;
 
 export type InsertPhoto = z.infer<typeof insertPhotoSchema>;
 export type Photo = typeof photos.$inferSelect;

@@ -2,6 +2,7 @@ import { HandDrawn } from "@/components/ui/hand-drawn";
 import { Button } from "@/components/ui/button";
 import { Camera, BookOpen, Compass, Plus } from "lucide-react";
 import { motion } from "framer-motion";
+import UserAccountMenu from "@/components/UserAccountMenu";
 
 interface HeaderProps {
   onCreateCollection: () => void;
@@ -43,7 +44,8 @@ export default function Header({ onCreateCollection }: HeaderProps) {
           </motion.div>
           <h1 className="font-quicksand font-bold text-2xl md:text-3xl text-[#9C7178]">Our Date Gallery</h1>
         </div>
-        <div>
+        <div className="flex items-center gap-4">
+          <UserAccountMenu />
           <HandDrawn>
             <Button 
               className="bg-[#9C7178] hover:bg-opacity-90 text-white font-quicksand"
