@@ -281,7 +281,7 @@ export default function ViewDateMemory() {
     <div className="bg-[#F4F1EA] min-h-screen p-4 md:p-8 relative font-lato text-[#4A4A4A]">
       <WatercolorOverlay />
       
-      <div className="max-w-5xl mx-auto relative z-10">
+      <div className="max-w-7xl mx-auto relative z-10">
         <Button 
           variant="outline" 
           className="mb-4 font-quicksand" 
@@ -290,205 +290,220 @@ export default function ViewDateMemory() {
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Memories
         </Button>
         
-        <HandDrawn className="bg-white overflow-hidden shadow-lg">
-          {activePhoto ? (
-            <div className="relative">
-              <img 
-                src={activePhoto.filePath} 
-                alt={activePhoto.title || memory.name} 
-                className="w-full object-contain max-h-[50vh]"
-              />
-              <Button 
-                className="absolute top-4 right-4 bg-[#E6B89C] hover:bg-[#9C7178] text-white font-quicksand"
-                onClick={() => setIsUploading(!isUploading)}
-              >
-                <Plus className="mr-2 h-4 w-4" /> Upload Photos
-              </Button>
-            </div>
-          ) : (
-            <div className="bg-gray-100 flex items-center justify-center h-[40vh] relative">
-              <div className="text-center p-8">
-                <Image className="h-16 w-16 mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-500">No photos in this memory yet</p>
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr,400px] gap-6">
+          {/* Main content */}
+          <HandDrawn className="bg-white overflow-hidden shadow-lg">
+            {activePhoto ? (
+              <div className="relative">
+                <img 
+                  src={activePhoto.filePath} 
+                  alt={activePhoto.title || memory.name} 
+                  className="w-full object-contain max-h-[50vh]"
+                />
+                <Button 
+                  className="absolute top-4 right-4 bg-[#E6B89C] hover:bg-[#9C7178] text-white font-quicksand"
+                  onClick={() => setIsUploading(!isUploading)}
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Upload Photos
+                </Button>
               </div>
-              <Button 
-                className="absolute top-4 right-4 bg-[#E6B89C] hover:bg-[#9C7178] text-white font-quicksand"
-                onClick={() => setIsUploading(!isUploading)}
-              >
-                <Plus className="mr-2 h-4 w-4" /> Upload Photos
-              </Button>
-            </div>
-          )}
-          
-          <div className="p-6">
-            <h1 className="font-quicksand font-bold text-2xl md:text-3xl mb-2">{memory.name}</h1>
-            <div className="flex items-center text-[#9C7178] mb-2">
-              <Calendar className="h-5 w-5 mr-1" />
-              <span>{formattedDate}</span>
-            </div>
-            <p className="text-lg mb-6">{memory.description}</p>
-            
-            {/* Upload section */}
-            {isUploading && (
-              <div className="mb-6 p-4 bg-[#F4F1EA] rounded-lg">
-                <div className="space-y-4">
-                  <HandDrawn>
-                    <div 
-                      {...getRootProps()} 
-                      className={`border-2 border-dashed border-[#88B9B0] rounded-lg p-4 text-center cursor-pointer 
-                        ${isDragActive ? 'bg-[#88B9B0] bg-opacity-10' : 'bg-white'}`}
-                    >
-                      <input {...getInputProps()} />
-                      <CloudUpload className="h-8 w-8 text-[#88B9B0] mx-auto mb-2" />
-                      <p className="text-[#4A4A4A] text-sm mb-1">
-                        {isDragActive ? "Drop photos here..." : "Drag and drop photos here"}
-                      </p>
-                      <p className="text-xs text-gray-500 mb-2">or</p>
-                      <Button 
-                        type="button" 
-                        className="bg-[#88B9B0] hover:bg-opacity-90 text-white font-quicksand text-sm py-1 h-8"
-                      >
-                        Choose Photos
-                      </Button>
-                    </div>
-                  </HandDrawn>
-                  
-                  {/* Upload photos preview */}
-                  {uploadPhotos.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">{uploadPhotos.length} photo{uploadPhotos.length !== 1 ? 's' : ''} ready to upload:</p>
-                      <div className="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto p-2 bg-gray-50 rounded-lg">
-                        {uploadPhotos.map((photo, index) => (
-                          <div key={index} className="relative group">
-                            <img 
-                              src={photo.preview} 
-                              alt={`Upload ${index + 1}`} 
-                              className="w-full h-20 object-cover rounded-md"
-                            />
-                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
-                              <Button 
-                                variant="ghost" 
-                                className="opacity-0 group-hover:opacity-100 text-white bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full p-1 h-7 w-7"
-                                onClick={() => removeUploadPhoto(index)}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </div>
-                            <Input
-                              value={photo.title}
-                              onChange={(e) => {
-                                const newPhotos = [...uploadPhotos];
-                                newPhotos[index].title = e.target.value;
-                                setUploadPhotos(newPhotos);
-                              }}
-                              className="mt-1 text-xs p-1 w-full h-6"
-                              placeholder="Photo title"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                      
-                      <div className="flex justify-end gap-2">
-                        <Button 
-                          variant="outline" 
-                          onClick={() => {
-                            uploadPhotos.forEach(photo => {
-                              URL.revokeObjectURL(photo.preview);
-                            });
-                            setUploadPhotos([]);
-                            setIsUploading(false);
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                        <Button 
-                          className="bg-[#88B9B0] hover:bg-opacity-90 text-white"
-                          onClick={handleUpload}
-                          disabled={uploadMutation.isPending}
-                        >
-                          {uploadMutation.isPending ? 'Uploading...' : `Upload ${uploadPhotos.length} Photo${uploadPhotos.length !== 1 ? 's' : ''}`}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+            ) : (
+              <div className="bg-gray-100 flex items-center justify-center h-[40vh] relative">
+                <div className="text-center p-8">
+                  <Image className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-500">No photos in this memory yet</p>
                 </div>
+                <Button 
+                  className="absolute top-4 right-4 bg-[#E6B89C] hover:bg-[#9C7178] text-white font-quicksand"
+                  onClick={() => setIsUploading(!isUploading)}
+                >
+                  <Plus className="mr-2 h-4 w-4" /> Upload Photos
+                </Button>
               </div>
             )}
             
-            {/* Photo thumbnails */}
-            {photos.length > 0 && (
-              <div className="mb-6">
-                <h3 className="font-quicksand font-medium text-lg mb-2">Photos from this moment:</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 overflow-x-auto">
-                  {photos.map((photo, index) => (
-                    <div 
-                      key={photo.id} 
-                      className={`cursor-pointer border-2 overflow-hidden rounded-md ${
-                        index === activePhotoIndex ? 'border-[#9C7178]' : 'border-transparent'
-                      }`}
-                      onClick={() => setActivePhotoIndex(index)}
-                    >
-                      <img 
-                        src={photo.filePath} 
-                        alt={photo.title || `Photo ${index + 1}`} 
-                        className="w-full h-20 object-cover"
-                      />
-                    </div>
-                  ))}
-                </div>
+            <div className="p-6">
+              <h1 className="font-quicksand font-bold text-2xl md:text-3xl mb-2">{memory.name}</h1>
+              <div className="flex items-center text-[#9C7178] mb-2">
+                <Calendar className="h-5 w-5 mr-1" />
+                <span>{formattedDate}</span>
               </div>
-            )}
-            
-            <div className="flex flex-wrap justify-between items-center border-t pt-4">
-              <div className="flex items-center">
-                <Image className="h-4 w-4 mr-1" />
-                <span>{photos.length} photo{photos.length !== 1 ? 's' : ''}</span>
-              </div>
+              <p className="text-lg mb-6">{memory.description}</p>
               
-              <div className="flex flex-wrap gap-2 mt-4 sm:mt-0">
-                <Button variant="outline" className="flex items-center gap-2">
-                  <Heart className="h-5 w-5" />
-                  Like
-                </Button>
+              {/* Upload section */}
+              {isUploading && (
+                <div className="mb-6 p-4 bg-[#F4F1EA] rounded-lg">
+                  <div className="space-y-4">
+                    <HandDrawn>
+                      <div 
+                        {...getRootProps()} 
+                        className={`border-2 border-dashed border-[#88B9B0] rounded-lg p-4 text-center cursor-pointer 
+                          ${isDragActive ? 'bg-[#88B9B0] bg-opacity-10' : 'bg-white'}`}
+                      >
+                        <input {...getInputProps()} />
+                        <CloudUpload className="h-8 w-8 text-[#88B9B0] mx-auto mb-2" />
+                        <p className="text-[#4A4A4A] text-sm mb-1">
+                          {isDragActive ? "Drop photos here..." : "Drag and drop photos here"}
+                        </p>
+                        <p className="text-xs text-gray-500 mb-2">or</p>
+                        <Button 
+                          type="button" 
+                          className="bg-[#88B9B0] hover:bg-opacity-90 text-white font-quicksand text-sm py-1 h-8"
+                        >
+                          Choose Photos
+                        </Button>
+                      </div>
+                    </HandDrawn>
+                    
+                    {/* Upload photos preview */}
+                    {uploadPhotos.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">{uploadPhotos.length} photo{uploadPhotos.length !== 1 ? 's' : ''} ready to upload:</p>
+                        <div className="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto p-2 bg-gray-50 rounded-lg">
+                          {uploadPhotos.map((photo, index) => (
+                            <div key={index} className="relative group">
+                              <img 
+                                src={photo.preview} 
+                                alt={`Upload ${index + 1}`} 
+                                className="w-full h-20 object-cover rounded-md"
+                              />
+                              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
+                                <Button 
+                                  variant="ghost" 
+                                  className="opacity-0 group-hover:opacity-100 text-white bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full p-1 h-7 w-7"
+                                  onClick={() => removeUploadPhoto(index)}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <Input
+                                value={photo.title}
+                                onChange={(e) => {
+                                  const newPhotos = [...uploadPhotos];
+                                  newPhotos[index].title = e.target.value;
+                                  setUploadPhotos(newPhotos);
+                                }}
+                                className="mt-1 text-xs p-1 w-full h-6"
+                                placeholder="Photo title"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <div className="flex justify-end gap-2">
+                          <Button 
+                            variant="outline" 
+                            onClick={() => {
+                              uploadPhotos.forEach(photo => {
+                                URL.revokeObjectURL(photo.preview);
+                              });
+                              setUploadPhotos([]);
+                              setIsUploading(false);
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                          <Button 
+                            className="bg-[#88B9B0] hover:bg-opacity-90 text-white"
+                            onClick={handleUpload}
+                            disabled={uploadMutation.isPending}
+                          >
+                            {uploadMutation.isPending ? 'Uploading...' : `Upload ${uploadPhotos.length} Photo${uploadPhotos.length !== 1 ? 's' : ''}`}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Photo thumbnails */}
+              {photos.length > 0 && (
+                <div className="mb-6">
+                  <h3 className="font-quicksand font-medium text-lg mb-2">Photos from this moment:</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 overflow-x-auto">
+                    {photos.map((photo, index) => (
+                      <div 
+                        key={photo.id} 
+                        className={`cursor-pointer border-2 overflow-hidden rounded-md ${
+                          index === activePhotoIndex ? 'border-[#9C7178]' : 'border-transparent'
+                        }`}
+                        onClick={() => setActivePhotoIndex(index)}
+                      >
+                        <img 
+                          src={photo.filePath} 
+                          alt={photo.title || `Photo ${index + 1}`} 
+                          className="w-full h-20 object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex flex-wrap justify-between items-center border-t pt-4">
+                <div className="flex items-center">
+                  <Image className="h-4 w-4 mr-1" />
+                  <span>{photos.length} photo{photos.length !== 1 ? 's' : ''}</span>
+                </div>
                 
-                <Button variant="outline" className="flex items-center gap-2">
-                  <Share2 className="h-5 w-5" />
-                  Share
-                </Button>
-                
-                <Button variant="outline" className="flex items-center gap-2">
-                  <Edit className="h-5 w-5" />
-                  Edit
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="flex items-center gap-2"
-                  onClick={() => setIsCommentsSidebarOpen(true)}
-                >
-                  <MessageCircle className="h-5 w-5" />
-                  Comments
-                </Button>
-                
-                <Button 
-                  variant={isDeleting ? "destructive" : "outline"} 
-                  className="flex items-center gap-2"
-                  onClick={handleDelete}
-                  disabled={deleteMutation.isPending}
-                >
-                  <Trash2 className="h-5 w-5" />
-                  {isDeleting ? 'Confirm Delete?' : 'Delete'}
-                </Button>
+                <div className="flex flex-wrap gap-2 mt-4 sm:mt-0">
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <Heart className="h-5 w-5" />
+                    Like
+                  </Button>
+                  
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <Share2 className="h-5 w-5" />
+                    Share
+                  </Button>
+                  
+                  <Button variant="outline" className="flex items-center gap-2">
+                    <Edit className="h-5 w-5" />
+                    Edit
+                  </Button>
+                  
+                  {/* Show comments button only on mobile */}
+                  <Button 
+                    variant="outline" 
+                    className="flex xl:hidden items-center gap-2"
+                    onClick={() => setIsCommentsSidebarOpen(true)}
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                    Comments
+                  </Button>
+                  
+                  <Button 
+                    variant={isDeleting ? "destructive" : "outline"} 
+                    className="flex items-center gap-2"
+                    onClick={handleDelete}
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="h-5 w-5" />
+                    {isDeleting ? 'Confirm Delete?' : 'Delete'}
+                  </Button>
+                </div>
               </div>
             </div>
+          </HandDrawn>
+          
+          {/* Comments sidebar - visible on desktop */}
+          <div className="hidden xl:block">
+            <CommentsSidebar 
+              collectionId={id} 
+              isDesktopSidebar={true}
+            />
           </div>
-        </HandDrawn>
+        </div>
         
-        <CommentsSidebar 
-          collectionId={id} 
-          isOpen={isCommentsSidebarOpen}
-          onOpenChange={setIsCommentsSidebarOpen}
-        />
+        {/* Comments sidebar for mobile - sheet overlay */}
+        <div className="xl:hidden">
+          <CommentsSidebar 
+            collectionId={id} 
+            isOpen={isCommentsSidebarOpen}
+            onOpenChange={setIsCommentsSidebarOpen}
+          />
+        </div>
       </div>
     </div>
   );

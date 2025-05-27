@@ -4,7 +4,7 @@ import { API_ENDPOINTS } from "@/lib/constants";
 import { Comment } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -28,9 +28,10 @@ interface CommentsSidebarProps {
   collectionId: string;
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
+  isDesktopSidebar?: boolean;
 }
 
-export function CommentsSidebar({ collectionId, isOpen, onOpenChange }: CommentsSidebarProps) {
+export function CommentsSidebar({ collectionId, isOpen, onOpenChange, isDesktopSidebar }: CommentsSidebarProps) {
   const { toast } = useToast();
   const [newComment, setNewComment] = useState("");
   const [editingComment, setEditingComment] = useState<{ id: number; content: string } | null>(null);
@@ -43,7 +44,7 @@ export function CommentsSidebar({ collectionId, isOpen, onOpenChange }: Comments
     error: commentsError
   } = useQuery<CommentWithUser[]>({
     queryKey: [API_ENDPOINTS.collectionComments(collectionId)],
-    enabled: isOpen && !!collectionId,
+    enabled: (isOpen && !!collectionId) || (isDesktopSidebar && !!collectionId),
   });
 
   // Create comment mutation
@@ -146,14 +147,12 @@ export function CommentsSidebar({ collectionId, isOpen, onOpenChange }: Comments
 
   const content = (
     <div className="flex flex-col h-full">
-      <SheetHeader className="p-4 pb-2">
-        <SheetTitle className="flex items-center gap-2 font-quicksand">
+      <div className="p-4 pb-2 border-b">
+        <h2 className="flex items-center gap-2 font-quicksand font-bold text-lg text-[#9C7178]">
           <MessageCircle className="h-5 w-5 text-[#9C7178]" />
           Memory Comments ({comments.length})
-        </SheetTitle>
-      </SheetHeader>
-      
-      <Separator />
+        </h2>
+      </div>
       
       {/* Comments list */}
       <ScrollArea className="flex-1 p-4">
@@ -315,6 +314,15 @@ export function CommentsSidebar({ collectionId, isOpen, onOpenChange }: Comments
       </div>
     </div>
   );
+
+  // Desktop sidebar mode
+  if (isDesktopSidebar) {
+    return (
+      <HandDrawn className="bg-white h-[calc(100vh-12rem)] overflow-hidden shadow-lg">
+        {content}
+      </HandDrawn>
+    );
+  }
 
   if (onOpenChange) {
     return (
