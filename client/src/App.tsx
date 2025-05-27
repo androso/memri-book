@@ -39,7 +39,7 @@ function App() {
           </Route>
           <Route component={NotFound} />
         </Switch>
-        <Toaster />
+      <Toaster />
       </AuthProvider>
     </QueryClientProvider>
   );

@@ -136,7 +136,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/auth/logout', requireAuth, async (req: Request, res: Response) => {
     try {
       if (req.sessionId) {
-        AuthService.logout(req.sessionId);
+        await AuthService.logout(req.sessionId);
       }
       
       res.clearCookie('sessionId');
