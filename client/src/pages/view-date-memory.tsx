@@ -11,6 +11,7 @@ import { HandDrawn } from "@/components/ui/hand-drawn";
 import { formatDate } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CommentsSidebar } from "@/components/CommentsSidebar";
 import { 
   ArrowLeft, 
   Heart, 
@@ -21,7 +22,8 @@ import {
   Image,
   Plus,
   CloudUpload,
-  X
+  X,
+  MessageCircle
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -40,6 +42,7 @@ export default function ViewDateMemory() {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadPhotos, setUploadPhotos] = useState<PhotoUpload[]>([]);
+  const [isCommentsSidebarOpen, setIsCommentsSidebarOpen] = useState(false);
 
   // Early return if no id
   if (!id) {
@@ -459,6 +462,15 @@ export default function ViewDateMemory() {
                 </Button>
                 
                 <Button 
+                  variant="outline" 
+                  className="flex items-center gap-2"
+                  onClick={() => setIsCommentsSidebarOpen(true)}
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  Comments
+                </Button>
+                
+                <Button 
                   variant={isDeleting ? "destructive" : "outline"} 
                   className="flex items-center gap-2"
                   onClick={handleDelete}
@@ -471,6 +483,12 @@ export default function ViewDateMemory() {
             </div>
           </div>
         </HandDrawn>
+        
+        <CommentsSidebar 
+          collectionId={id} 
+          isOpen={isCommentsSidebarOpen}
+          onOpenChange={setIsCommentsSidebarOpen}
+        />
       </div>
     </div>
   );

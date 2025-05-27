@@ -46,7 +46,9 @@ export const API_ENDPOINTS = {
   collection: (id: string | number) => `/api/collections/${id}`,
   likePhoto: (id: string | number) => `/api/photos/${id}/like`,
   photosByCollection: (collectionId: string | number) => `/api/photos?collectionId=${collectionId}`,
-  collectionPhotos: (collectionId: string | number) => `/api/photos?collectionId=${collectionId}`
+  collectionPhotos: (collectionId: string | number) => `/api/photos?collectionId=${collectionId}`,
+  collectionComments: (collectionId: string | number) => `/api/collections/${collectionId}/comments`,
+  comment: (id: string | number) => `/api/comments/${id}`
 };
 
 // Format date in a human-readable way

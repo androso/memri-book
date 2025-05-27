@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCollectionSchema, insertPhotoSchema, loginSchema, updateUserSchema } from "@shared/schema";
+import { insertCollectionSchema, insertPhotoSchema, loginSchema, updateUserSchema, insertCommentSchema } from "@shared/schema";
 import { AuthService, requireAuth, optionalAuth } from "./auth";
 import multer from "multer";
 import { ZodError } from "zod";
@@ -599,6 +599,185 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error deleting photo:', error);
       return res.status(500).json({ message: 'Failed to delete photo' });
+    }
+  });
+
+  // Comments API
+  app.get('/api/collections/:id/comments', requireAuth, async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'User not authenticated' });
+      }
+      
+      const collectionId = parseInt(req.params.id);
+      if (isNaN(collectionId)) {
+        return res.status(400).json({ message: 'Invalid collection ID' });
+      }
+
+      // Check if user has access to this collection
+      const ownership = await storage.checkCollectionOwnership(collectionId, req.user.id);
+      if (!ownership) {
+        return res.status(403).json({ message: 'Not authorized to view comments for this collection' });
+      }
+
+      const comments = await storage.getComments(collectionId);
+      
+      // Get user information for each comment
+      const commentsWithUsers = await Promise.all(
+        comments.map(async (comment) => {
+          const user = comment.userId ? await storage.getUser(comment.userId) : null;
+          return {
+            ...comment,
+            user: user ? { id: user.id, username: user.username, displayName: user.displayName, profilePicture: user.profilePicture } : null
+          };
+        })
+      );
+      
+      return res.json(commentsWithUsers);
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      return res.status(500).json({ message: 'Failed to fetch comments' });
+    }
+  });
+
+  app.post('/api/collections/:id/comments', requireAuth, async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'User not authenticated' });
+      }
+      
+      const collectionId = parseInt(req.params.id);
+      if (isNaN(collectionId)) {
+        return res.status(400).json({ message: 'Invalid collection ID' });
+      }
+
+      // Check if user has access to this collection
+      const ownership = await storage.checkCollectionOwnership(collectionId, req.user.id);
+      if (!ownership) {
+        return res.status(403).json({ message: 'Not authorized to comment on this collection' });
+      }
+
+      const { content } = req.body;
+      if (!content || content.trim().length === 0) {
+        return res.status(400).json({ message: 'Comment content is required' });
+      }
+
+      const data = validateSchema(insertCommentSchema, {
+        content: content.trim(),
+        collectionId,
+        userId: req.user.id
+      });
+
+      const comment = await withDatabaseRetry(() => storage.createComment(data));
+      
+      // Return comment with user information
+      const user = await storage.getUser(req.user.id);
+      const commentWithUser = {
+        ...comment,
+        user: user ? { id: user.id, username: user.username, displayName: user.displayName, profilePicture: user.profilePicture } : null
+      };
+      
+      return res.status(201).json(commentWithUser);
+    } catch (error) {
+      console.error('Error creating comment:', error);
+      
+      if (error instanceof Error) {
+        if (error.message.includes('ETIMEDOUT')) {
+          return res.status(503).json({ 
+            message: 'Database connection timeout. Please try again in a moment.',
+            code: 'DATABASE_TIMEOUT'
+          });
+        }
+        if (error.message.includes('ECONNRESET')) {
+          return res.status(503).json({ 
+            message: 'Database connection was reset. Please try again.',
+            code: 'CONNECTION_RESET'
+          });
+        }
+      }
+      
+      return res.status(400).json({ 
+        message: error instanceof Error ? error.message : 'Failed to create comment',
+        code: 'CREATION_FAILED'
+      });
+    }
+  });
+
+  app.put('/api/comments/:id', requireAuth, async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'User not authenticated' });
+      }
+      
+      const commentId = parseInt(req.params.id);
+      if (isNaN(commentId)) {
+        return res.status(400).json({ message: 'Invalid comment ID' });
+      }
+
+      const comment = await storage.getComment(commentId);
+      if (!comment) {
+        return res.status(404).json({ message: 'Comment not found' });
+      }
+
+      if (comment.userId !== req.user.id) {
+        return res.status(403).json({ message: 'Not authorized to update this comment' });
+      }
+
+      const { content } = req.body;
+      if (!content || content.trim().length === 0) {
+        return res.status(400).json({ message: 'Comment content is required' });
+      }
+
+      const data = validateSchema(insertCommentSchema.partial(), { content: content.trim() });
+      const updatedComment = await storage.updateComment(commentId, data);
+      
+      if (!updatedComment) {
+        return res.status(404).json({ message: 'Comment not found' });
+      }
+      
+      // Return comment with user information
+      const user = await storage.getUser(req.user.id);
+      const commentWithUser = {
+        ...updatedComment,
+        user: user ? { id: user.id, username: user.username, displayName: user.displayName, profilePicture: user.profilePicture } : null
+      };
+      
+      return res.json(commentWithUser);
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      return res.status(400).json({ message: error instanceof Error ? error.message : 'Failed to update comment' });
+    }
+  });
+
+  app.delete('/api/comments/:id', requireAuth, async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: 'User not authenticated' });
+      }
+      
+      const commentId = parseInt(req.params.id);
+      if (isNaN(commentId)) {
+        return res.status(400).json({ message: 'Invalid comment ID' });
+      }
+
+      const comment = await storage.getComment(commentId);
+      if (!comment) {
+        return res.status(404).json({ message: 'Comment not found' });
+      }
+
+      if (comment.userId !== req.user.id) {
+        return res.status(403).json({ message: 'Not authorized to delete this comment' });
+      }
+
+      const success = await storage.deleteComment(commentId);
+      if (success) {
+        return res.status(204).end();
+      } else {
+        return res.status(500).json({ message: 'Failed to delete comment' });
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      return res.status(500).json({ message: 'Failed to delete comment' });
     }
   });
 
