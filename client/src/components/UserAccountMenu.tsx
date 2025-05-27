@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -11,68 +10,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { User, Settings, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-interface User {
-  id: number;
-  username: string;
-  displayName: string;
-  profilePicture?: string;
-}
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function UserAccountMenu() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  // Fetch current user data
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const response = await fetch('/api/auth/me', {
-          credentials: 'include',
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setUser(data.user);
-        } else {
-          // User not authenticated, redirect to login
-          navigate('/login');
-        }
-      } catch (error) {
-        console.error('Error fetching user:', error);
-        navigate('/login');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUser();
-  }, [navigate]);
+  const { user, logout } = useAuth();
 
   const handleSignOut = async () => {
     try {
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
+      await logout();
+      toast({
+        title: "Signed out successfully",
+        description: "You have been logged out of Memri.",
       });
-
-      if (response.ok) {
-        toast({
-          title: "Signed out successfully",
-          description: "You have been logged out of Memri.",
-        });
-        navigate('/login');
-      } else {
-        toast({
-          title: "Sign out failed",
-          description: "There was an error signing you out.",
-          variant: "destructive",
-        });
-      }
     } catch (error) {
-      console.error('Sign out error:', error);
       toast({
         title: "Sign out failed",
         description: "There was an error signing you out.",
@@ -85,8 +37,8 @@ export default function UserAccountMenu() {
     navigate('/profile');
   };
 
-  // Don't render anything if loading or no user
-  if (loading || !user) {
+  // Don't render anything if no user (loading is handled by ProtectedRoute)
+  if (!user) {
     return null;
   }
 

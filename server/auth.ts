@@ -2,12 +2,11 @@ import bcrypt from "bcryptjs";
 import { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { LoginRequest } from "@shared/schema";
-
-// Simple session store (in production, use Redis or database)
-const sessions = new Map<string, { userId: number; username: string; expiresAt: Date }>();
+import { sessionStore } from "./sessionStore";
 
 // Session configuration
-const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
+const SESSION_REFRESH_THRESHOLD = 24 * 60 * 60 * 1000; // Refresh if less than 24 hours remaining
 
 // Extend Express Request type to include user
 declare global {
@@ -46,7 +45,7 @@ export class AuthService {
     const sessionId = this.generateSessionId();
     const expiresAt = new Date(Date.now() + SESSION_DURATION);
     
-    sessions.set(sessionId, {
+    sessionStore.set(sessionId, {
       userId,
       username,
       expiresAt
@@ -57,13 +56,20 @@ export class AuthService {
 
   // Get session
   static getSession(sessionId: string) {
-    const session = sessions.get(sessionId);
+    const session = sessionStore.get(sessionId);
     if (!session) return null;
 
     // Check if session is expired
     if (session.expiresAt < new Date()) {
-      sessions.delete(sessionId);
+      sessionStore.delete(sessionId);
       return null;
+    }
+
+    // Auto-refresh session if it's close to expiring
+    const timeUntilExpiry = session.expiresAt.getTime() - Date.now();
+    if (timeUntilExpiry < SESSION_REFRESH_THRESHOLD) {
+      session.expiresAt = new Date(Date.now() + SESSION_DURATION);
+      sessionStore.set(sessionId, session);
     }
 
     return session;
@@ -71,17 +77,12 @@ export class AuthService {
 
   // Delete session
   static deleteSession(sessionId: string): void {
-    sessions.delete(sessionId);
+    sessionStore.delete(sessionId);
   }
 
   // Clean expired sessions
   static cleanExpiredSessions(): void {
-    const now = new Date();
-    for (const [sessionId, session] of sessions.entries()) {
-      if (session.expiresAt < now) {
-        sessions.delete(sessionId);
-      }
-    }
+    sessionStore.cleanExpiredSessions();
   }
 
   // Login user

@@ -8,6 +8,7 @@ import { WatercolorOverlay } from "@/components/ui/watercolor-overlay";
 import { HandDrawn } from "@/components/ui/hand-drawn";
 import { Camera, User, Lock, Save, ArrowLeft, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface User {
   id: number;
@@ -21,8 +22,7 @@ interface User {
 export default function ProfilePage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, refreshUser } = useAuth();
   const [saving, setSaving] = useState(false);
   
   // Form state
@@ -32,33 +32,13 @@ export default function ProfilePage() {
   const [profilePicture, setProfilePicture] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // Fetch current user data
+  // Initialize form with user data
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const response = await fetch('/api/auth/me', {
-          credentials: 'include',
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setUser(data.user);
-          setDisplayName(data.user.displayName);
-          setPreviewUrl(data.user.profilePicture);
-        } else {
-          // User not authenticated, redirect to login
-          navigate('/login');
-        }
-      } catch (error) {
-        console.error('Error fetching user:', error);
-        navigate('/login');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUser();
-  }, [navigate]);
+    if (user) {
+      setDisplayName(user.displayName);
+      setPreviewUrl(user.profilePicture || null);
+    }
+  }, [user]);
 
   const handleProfilePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -107,7 +87,8 @@ export default function ProfilePage() {
       const data = await response.json();
 
       if (response.ok) {
-        setUser(data.user);
+        // Refresh user data from the auth context
+        await refreshUser();
         setPassword("");
         setConfirmPassword("");
         setProfilePicture(null);
@@ -134,14 +115,6 @@ export default function ProfilePage() {
       setSaving(false);
     }
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#F4F1EA] flex items-center justify-center">
-        <div className="text-[#4A4A4A] text-lg">Loading...</div>
-      </div>
-    );
-  }
 
   if (!user) {
     return null;

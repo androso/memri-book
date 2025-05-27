@@ -106,8 +106,21 @@ export default function ViewDateMemory() {
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || "Failed to upload photo");
+          let errorMessage = "Failed to upload photo";
+          try {
+            const errorData = await response.json();
+            if (errorData.code === 'DATABASE_TIMEOUT') {
+              errorMessage = "Database connection timeout. Please try again in a moment.";
+            } else if (errorData.code === 'CONNECTION_RESET') {
+              errorMessage = "Connection was reset. Please try again.";
+            } else {
+              errorMessage = errorData.message || errorMessage;
+            }
+          } catch {
+            // If JSON parsing fails, use status text
+            errorMessage = response.statusText || errorMessage;
+          }
+          throw new Error(errorMessage);
         }
 
         return await response.json();
@@ -133,9 +146,27 @@ export default function ViewDateMemory() {
       setIsUploading(false);
     },
     onError: (error) => {
+      console.error('Upload error:', error);
+      
+      let title = "Upload failed";
+      let description = "An unknown error occurred";
+      
+      if (error instanceof Error) {
+        description = error.message;
+        
+        // Provide user-friendly messages for specific errors
+        if (error.message.includes('timeout')) {
+          title = "Connection timeout";
+          description = "The upload took too long. Please check your connection and try again.";
+        } else if (error.message.includes('reset')) {
+          title = "Connection interrupted";
+          description = "The connection was interrupted. Please try again.";
+        }
+      }
+      
       toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
+        title,
+        description,
         variant: "destructive",
       });
       setIsUploading(false);

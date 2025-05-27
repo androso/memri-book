@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WatercolorOverlay } from "@/components/ui/watercolor-overlay";
 import { Camera, User, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface User {
   id: string;
@@ -16,11 +17,19 @@ interface User {
 export default function LoginPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { user, login } = useAuth();
   const [hoveredUser, setHoveredUser] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/');
+    }
+  }, [user, navigate]);
 
   const users: User[] = [
     {
@@ -49,20 +58,9 @@ export default function LoginPage() {
     setIsLoading(true);
     
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: selectedUser.id,
-          password: password,
-        }),
-      });
+      const success = await login(selectedUser.id, password);
 
-      const data = await response.json();
-
-      if (response.ok) {
+      if (success) {
         toast({
           title: `Welcome back, ${selectedUser.name}!`,
           description: "You have successfully signed in to Memri.",
@@ -73,7 +71,7 @@ export default function LoginPage() {
       } else {
         toast({
           title: "Login Failed",
-          description: data.message || "Invalid username or password",
+          description: "Invalid username or password",
           variant: "destructive",
         });
       }

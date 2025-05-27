@@ -50,9 +50,63 @@ function generateFileName(originalName: string): string {
   return `photo-${timestamp}-${randomNum}.${extension}`;
 }
 
+// Helper function to handle database connection issues
+async function withDatabaseRetry<T>(operation: () => Promise<T>, maxRetries = 3): Promise<T> {
+  let lastError: Error;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`Database operation failed (attempt ${attempt}/${maxRetries}):`, error);
+      
+      // If it's a connection timeout, wait before retrying
+      if (error instanceof Error && (error.message.includes('ETIMEDOUT') || error.message.includes('ECONNRESET'))) {
+        if (attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000); // Exponential backoff, max 5s
+          console.log(`Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+      }
+      
+      // For non-connection errors, don't retry
+      throw error;
+    }
+  }
+  
+  throw lastError!;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Add cookie parser middleware
   app.use(cookieParser());
+
+  // Health check endpoint
+  app.get('/api/health', async (req: Request, res: Response) => {
+    try {
+      const { checkDatabaseHealth } = await import('./storage');
+      const dbHealthy = await checkDatabaseHealth();
+      
+      const health = {
+        status: dbHealthy ? 'healthy' : 'unhealthy',
+        timestamp: new Date().toISOString(),
+        database: dbHealthy ? 'connected' : 'disconnected',
+        uptime: process.uptime(),
+      };
+      
+      res.status(dbHealthy ? 200 : 503).json(health);
+    } catch (error) {
+      res.status(503).json({
+        status: 'unhealthy',
+        timestamp: new Date().toISOString(),
+        database: 'error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        uptime: process.uptime(),
+      });
+    }
+  });
 
   // Authentication routes
   app.post('/api/auth/login', async (req: Request, res: Response) => {
@@ -69,7 +123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
       });
       
       return res.json({ user: result.user, sessionId: result.sessionId });
@@ -183,6 +237,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: 'User not authenticated' });
       }
       
+      console.log(`Creating collection for user ${req.user.username} (${req.user.id})`);
+      
       // Parse form data from req.body
       const { name, description, type } = req.body;
       
@@ -190,7 +246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Name is required' });
       }
       
-      // Create collection
+      // Create collection with retry logic
       const data = validateSchema(insertCollectionSchema, {
         name,
         description,
@@ -198,10 +254,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: req.user.id
       });
       
-      const collection = await storage.createCollection(data);
+      const collection = await withDatabaseRetry(() => storage.createCollection(data));
+      console.log(`Collection created successfully: ${collection.id}`);
       
       // Handle photo uploads if any
       if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+        console.log(`Processing ${req.files.length} photo uploads`);
         const photoTitles = Array.isArray(req.body.photoTitle) 
           ? req.body.photoTitle 
           : [req.body.photoTitle];
@@ -210,12 +268,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const file = req.files[i];
           const title = photoTitles[i] || file.originalname;
           
+          console.log(`Processing photo ${i + 1}/${req.files.length}: ${title}`);
+          
           // Generate unique filename and save to filesystem
           const fileName = generateFileName(file.originalname);
           const filePath = await storage.savePhotoToFilesystem(file.buffer, fileName);
           
-          // Save photo to collection
-          await storage.createPhoto({
+          // Save photo to collection with retry logic
+          await withDatabaseRetry(() => storage.createPhoto({
             title,
             fileName: fileName,
             fileType: file.mimetype,
@@ -223,14 +283,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
             userId: req.user.id,
             collectionId: collection.id,
             isLiked: false
-          });
+          }));
+          
+          console.log(`Photo ${i + 1} saved successfully`);
         }
       }
       
       return res.status(201).json(collection);
     } catch (error) {
       console.error('Error creating collection:', error);
-      return res.status(400).json({ message: error instanceof Error ? error.message : 'Failed to create collection' });
+      
+      // Provide more specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes('ETIMEDOUT')) {
+          return res.status(503).json({ 
+            message: 'Database connection timeout. Please try again in a moment.',
+            code: 'DATABASE_TIMEOUT'
+          });
+        }
+        if (error.message.includes('ECONNRESET')) {
+          return res.status(503).json({ 
+            message: 'Database connection was reset. Please try again.',
+            code: 'CONNECTION_RESET'
+          });
+        }
+      }
+      
+      return res.status(400).json({ 
+        message: error instanceof Error ? error.message : 'Failed to create collection',
+        code: 'CREATION_FAILED'
+      });
     }
   });
 
@@ -355,10 +437,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const file = req.file;
+      console.log(`Uploading photo for user ${req.user.username}: ${file.originalname} (${file.size} bytes)`);
       
       // Generate unique filename and save to filesystem
       const fileName = generateFileName(file.originalname);
       const filePath = await storage.savePhotoToFilesystem(file.buffer, fileName);
+      console.log(`Photo saved to filesystem: ${filePath}`);
       
       const data = validateSchema(insertPhotoSchema, {
         ...req.body,
@@ -370,11 +454,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isLiked: req.body.isLiked === 'true'
       });
 
-      const photo = await storage.createPhoto(data);
+      const photo = await withDatabaseRetry(() => storage.createPhoto(data));
+      console.log(`Photo saved to database successfully: ${photo.id}`);
+      
       return res.status(201).json(photo);
     } catch (error) {
       console.error('Error creating photo:', error);
-      return res.status(400).json({ message: error instanceof Error ? error.message : 'Failed to create photo' });
+      
+      // Provide more specific error messages
+      if (error instanceof Error) {
+        if (error.message.includes('ETIMEDOUT')) {
+          return res.status(503).json({ 
+            message: 'Database connection timeout. Please try again in a moment.',
+            code: 'DATABASE_TIMEOUT'
+          });
+        }
+        if (error.message.includes('ECONNRESET')) {
+          return res.status(503).json({ 
+            message: 'Database connection was reset. Please try again.',
+            code: 'CONNECTION_RESET'
+          });
+        }
+      }
+      
+      return res.status(400).json({ 
+        message: error instanceof Error ? error.message : 'Failed to create photo',
+        code: 'CREATION_FAILED'
+      });
     }
   });
 

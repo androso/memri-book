@@ -52,9 +52,33 @@ if (!connectionString) {
   throw new Error("DATABASE_URL environment variable is not set");
 }
 
-console.log("Connecting to database with URL:", connectionString.replace(/:[^:@]*@/, ':***@')); // Log URL but hide password
-const client = postgres(connectionString);
+console.log("Connecting to database with URL:", connectionString.replace(/:[^:@]*@/, ':***@'));
+
+// Configure postgres client with better connection settings
+const client = postgres(connectionString, {
+  max: 20,                    // Maximum number of connections in pool
+  idle_timeout: 20,           // Close idle connections after 20 seconds
+  connect_timeout: 10,        // Connection timeout in seconds
+  prepare: false,             // Disable prepared statements for better compatibility
+  onnotice: () => {},         // Disable notices
+  debug: false,               // Disable debug logging
+  transform: {
+    undefined: null,          // Transform undefined to null
+  },
+});
+
 const db = drizzle(client);
+
+// Add database health check
+export async function checkDatabaseHealth(): Promise<boolean> {
+  try {
+    await client`SELECT 1`;
+    return true;
+  } catch (error) {
+    console.error('Database health check failed:', error);
+    return false;
+  }
+}
 
 export class DbStorage implements IStorage {
   private uploadsDir: string;
