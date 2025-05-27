@@ -300,6 +300,10 @@ export default function ViewDateMemory() {
                   alt={activePhoto.title || memory.name} 
                   className="w-full object-contain max-h-[50vh]"
                 />
+                <div className="absolute top-4 left-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
+                  <MessageCircle className="inline h-3 w-3 mr-1" />
+                  Comments for this photo
+                </div>
                 <Button 
                   className="absolute top-4 right-4 bg-[#E6B89C] hover:bg-[#9C7178] text-white font-quicksand"
                   onClick={() => setIsUploading(!isUploading)}
@@ -425,7 +429,7 @@ export default function ViewDateMemory() {
                     {photos.map((photo, index) => (
                       <div 
                         key={photo.id} 
-                        className={`cursor-pointer border-2 overflow-hidden rounded-md ${
+                        className={`cursor-pointer border-2 overflow-hidden rounded-md relative ${
                           index === activePhotoIndex ? 'border-[#9C7178]' : 'border-transparent'
                         }`}
                         onClick={() => setActivePhotoIndex(index)}
@@ -435,6 +439,10 @@ export default function ViewDateMemory() {
                           alt={photo.title || `Photo ${index + 1}`} 
                           className="w-full h-20 object-cover"
                         />
+                        {/* Comment indicator - we'll add this later when we have comment counts */}
+                        <div className="absolute bottom-1 right-1 bg-[#9C7178] text-white text-xs rounded-full w-5 h-5 flex items-center justify-center opacity-75">
+                          <MessageCircle className="h-3 w-3" />
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -468,6 +476,7 @@ export default function ViewDateMemory() {
                     variant="outline" 
                     className="flex xl:hidden items-center gap-2"
                     onClick={() => setIsCommentsSidebarOpen(true)}
+                    disabled={!activePhoto}
                   >
                     <MessageCircle className="h-5 w-5" />
                     Comments
@@ -489,20 +498,26 @@ export default function ViewDateMemory() {
           
           {/* Comments sidebar - visible on desktop */}
           <div className="hidden xl:block">
-            <CommentsSidebar 
-              collectionId={id} 
-              isDesktopSidebar={true}
-            />
+            {activePhoto && (
+              <CommentsSidebar 
+                photoId={activePhoto.id.toString()} 
+                photoTitle={activePhoto.title}
+                isDesktopSidebar={true}
+              />
+            )}
           </div>
         </div>
         
         {/* Comments sidebar for mobile - sheet overlay */}
         <div className="xl:hidden">
-          <CommentsSidebar 
-            collectionId={id} 
-            isOpen={isCommentsSidebarOpen}
-            onOpenChange={setIsCommentsSidebarOpen}
-          />
+          {activePhoto && (
+            <CommentsSidebar 
+              photoId={activePhoto.id.toString()}
+              photoTitle={activePhoto.title}
+              isOpen={isCommentsSidebarOpen}
+              onOpenChange={setIsCommentsSidebarOpen}
+            />
+          )}
         </div>
       </div>
     </div>

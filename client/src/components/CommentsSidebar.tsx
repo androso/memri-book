@@ -25,13 +25,14 @@ interface CommentWithUser extends Comment {
 }
 
 interface CommentsSidebarProps {
-  collectionId: string;
+  photoId: string;
+  photoTitle?: string;
   isOpen?: boolean;
   onOpenChange?: (open: boolean) => void;
   isDesktopSidebar?: boolean;
 }
 
-export function CommentsSidebar({ collectionId, isOpen, onOpenChange, isDesktopSidebar }: CommentsSidebarProps) {
+export function CommentsSidebar({ photoId, photoTitle, isOpen, onOpenChange, isDesktopSidebar }: CommentsSidebarProps) {
   const { toast } = useToast();
   const [newComment, setNewComment] = useState("");
   const [editingComment, setEditingComment] = useState<{ id: number; content: string } | null>(null);
@@ -43,21 +44,21 @@ export function CommentsSidebar({ collectionId, isOpen, onOpenChange, isDesktopS
     isLoading: commentsLoading,
     error: commentsError
   } = useQuery<CommentWithUser[]>({
-    queryKey: [API_ENDPOINTS.collectionComments(collectionId)],
-    enabled: (isOpen && !!collectionId) || (isDesktopSidebar && !!collectionId),
+    queryKey: [API_ENDPOINTS.photoComments(photoId)],
+    enabled: (isOpen && !!photoId) || (isDesktopSidebar && !!photoId),
   });
 
   // Create comment mutation
   const createCommentMutation = useMutation({
     mutationFn: (content: string) => 
-      apiRequest("POST", API_ENDPOINTS.collectionComments(collectionId), { content }),
+      apiRequest("POST", API_ENDPOINTS.photoComments(photoId), { content }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.collectionComments(collectionId)] });
+      queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.photoComments(photoId)] });
       setNewComment("");
       setIsSubmitting(false);
       toast({
         title: "Comment added",
-        description: "Your comment has been added to this memory.",
+        description: "Your comment has been added to this photo.",
       });
     },
     onError: (error) => {
@@ -75,7 +76,7 @@ export function CommentsSidebar({ collectionId, isOpen, onOpenChange, isDesktopS
     mutationFn: ({ id, content }: { id: number; content: string }) => 
       apiRequest("PUT", API_ENDPOINTS.comment(id), { content }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.collectionComments(collectionId)] });
+      queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.photoComments(photoId)] });
       setEditingComment(null);
       toast({
         title: "Comment updated",
@@ -96,7 +97,7 @@ export function CommentsSidebar({ collectionId, isOpen, onOpenChange, isDesktopS
     mutationFn: (commentId: number) => 
       apiRequest("DELETE", API_ENDPOINTS.comment(commentId), {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.collectionComments(collectionId)] });
+      queryClient.invalidateQueries({ queryKey: [API_ENDPOINTS.photoComments(photoId)] });
       toast({
         title: "Comment deleted",
         description: "Your comment has been deleted.",
@@ -150,8 +151,11 @@ export function CommentsSidebar({ collectionId, isOpen, onOpenChange, isDesktopS
       <div className="p-4 pb-2 border-b">
         <h2 className="flex items-center gap-2 font-quicksand font-bold text-lg text-[#9C7178]">
           <MessageCircle className="h-5 w-5 text-[#9C7178]" />
-          Memory Comments ({comments.length})
+          Photo Comments ({comments.length})
         </h2>
+        {photoTitle && (
+          <p className="text-sm text-gray-600 mt-1 truncate">{photoTitle}</p>
+        )}
       </div>
       
       {/* Comments list */}
@@ -206,7 +210,7 @@ export function CommentsSidebar({ collectionId, isOpen, onOpenChange, isDesktopS
                       </p>
                       <div className="flex items-center gap-1">
                         <span className="text-xs text-gray-400">
-                          {formatCommentDate(comment.createdAt)}
+                          {formatCommentDate(comment.createdAt ? comment.createdAt.toString() : null)}
                         </span>
                         
                         {comment.user && (

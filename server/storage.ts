@@ -35,8 +35,8 @@ export interface IStorage {
   deletePhoto(id: number): Promise<boolean>;
   toggleLikePhoto(id: number): Promise<Photo | undefined>;
   
-  // Comment operations (for future use)
-  getComments(collectionId: number): Promise<Comment[]>;
+  // Comment operations for photo-level comments
+  getComments(photoId: number): Promise<Comment[]>;
   getComment(id: number): Promise<Comment | undefined>;
   createComment(comment: InsertComment): Promise<Comment>;
   updateComment(id: number, comment: Partial<InsertComment>): Promise<Comment | undefined>;
@@ -439,10 +439,10 @@ export class DbStorage implements IStorage {
     return updatedPhoto;
   }
   
-  // Comment operations (for future use)
-  async getComments(collectionId: number): Promise<Comment[]> {
+  // Comment operations for photo-level comments
+  async getComments(photoId: number): Promise<Comment[]> {
     return await db.select().from(comments)
-      .where(eq(comments.collectionId, collectionId))
+      .where(eq(comments.photoId, photoId))
       .orderBy(desc(comments.createdAt));
   }
   

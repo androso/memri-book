@@ -50,11 +50,11 @@ export const photos = pgTable("photos", {
   uploadedAt: timestamp("uploaded_at").defaultNow(),
 });
 
-// Comments table for future use
+// Comments table for photo-level comments
 export const comments = pgTable("comments", {
   id: serial("id").primaryKey(),
   content: text("content").notNull(),
-  collectionId: integer("collection_id").references(() => collections.id),
+  photoId: integer("photo_id").references(() => photos.id, { onDelete: "cascade" }),
   userId: integer("user_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -109,7 +109,7 @@ export const insertPhotoSchema = createInsertSchema(photos).pick({
 
 export const insertCommentSchema = createInsertSchema(comments).pick({
   content: true,
-  collectionId: true,
+  photoId: true,
   userId: true,
 });
 

@@ -47,7 +47,7 @@ export const API_ENDPOINTS = {
   likePhoto: (id: string | number) => `/api/photos/${id}/like`,
   photosByCollection: (collectionId: string | number) => `/api/photos?collectionId=${collectionId}`,
   collectionPhotos: (collectionId: string | number) => `/api/photos?collectionId=${collectionId}`,
-  collectionComments: (collectionId: string | number) => `/api/collections/${collectionId}/comments`,
+  photoComments: (photoId: string | number) => `/api/photos/${photoId}/comments`,
   comment: (id: string | number) => `/api/comments/${id}`
 };
 

@@ -602,25 +602,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Comments API
-  app.get('/api/collections/:id/comments', requireAuth, async (req: Request, res: Response) => {
+  // Comments API - Photo-level comments
+  app.get('/api/photos/:id/comments', requireAuth, async (req: Request, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: 'User not authenticated' });
       }
       
-      const collectionId = parseInt(req.params.id);
-      if (isNaN(collectionId)) {
-        return res.status(400).json({ message: 'Invalid collection ID' });
+      const photoId = parseInt(req.params.id);
+      if (isNaN(photoId)) {
+        return res.status(400).json({ message: 'Invalid photo ID' });
       }
 
-      // Check if user has access to this collection
-      const ownership = await storage.checkCollectionOwnership(collectionId, req.user.id);
-      if (!ownership) {
-        return res.status(403).json({ message: 'Not authorized to view comments for this collection' });
+      // Check if photo exists and user has access to it
+      const photo = await storage.getPhoto(photoId);
+      if (!photo) {
+        return res.status(404).json({ message: 'Photo not found' });
       }
 
-      const comments = await storage.getComments(collectionId);
+      // Check if user has access to the collection containing this photo
+      if (photo.collectionId) {
+        const ownership = await storage.checkCollectionOwnership(photo.collectionId, req.user.id);
+        if (!ownership) {
+          return res.status(403).json({ message: 'Not authorized to view comments for this photo' });
+        }
+      }
+
+      const comments = await storage.getComments(photoId);
       
       // Get user information for each comment
       const commentsWithUsers = await Promise.all(
@@ -640,21 +648,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/collections/:id/comments', requireAuth, async (req: Request, res: Response) => {
+  app.post('/api/photos/:id/comments', requireAuth, async (req: Request, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: 'User not authenticated' });
       }
       
-      const collectionId = parseInt(req.params.id);
-      if (isNaN(collectionId)) {
-        return res.status(400).json({ message: 'Invalid collection ID' });
+      const photoId = parseInt(req.params.id);
+      if (isNaN(photoId)) {
+        return res.status(400).json({ message: 'Invalid photo ID' });
       }
 
-      // Check if user has access to this collection
-      const ownership = await storage.checkCollectionOwnership(collectionId, req.user.id);
-      if (!ownership) {
-        return res.status(403).json({ message: 'Not authorized to comment on this collection' });
+      // Check if photo exists and user has access to it
+      const photo = await storage.getPhoto(photoId);
+      if (!photo) {
+        return res.status(404).json({ message: 'Photo not found' });
+      }
+
+      // Check if user has access to the collection containing this photo
+      if (photo.collectionId) {
+        const ownership = await storage.checkCollectionOwnership(photo.collectionId, req.user.id);
+        if (!ownership) {
+          return res.status(403).json({ message: 'Not authorized to comment on this photo' });
+        }
       }
 
       const { content } = req.body;
@@ -664,7 +680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const data = validateSchema(insertCommentSchema, {
         content: content.trim(),
-        collectionId,
+        photoId,
         userId: req.user.id
       });
 
