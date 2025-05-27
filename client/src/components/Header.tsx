@@ -12,19 +12,24 @@ export default function Header({ onCreateCollection }: HeaderProps) {
   return (
     <header className="relative overflow-hidden">
       {/* Cloud decoration */}
-      <div className="cloud-decoration top-10 left-1/4">
-        <img 
-          src="https://images.unsplash.com/photo-1517056338492-99899a9fccf0?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3" 
-          alt="" 
-          className="w-48 h-auto opacity-20"
-        />
+      <div className="absolute top-10 left-1/4 opacity-20">
+        <div className="relative">
+          {/* Main cloud body */}
+          <div className="w-32 h-20 bg-gradient-to-r from-[#88B9B0] to-[#E6B89C] rounded-full"></div>
+          {/* Cloud bumps */}
+          <div className="absolute -top-4 left-6 w-16 h-16 bg-gradient-to-r from-[#88B9B0] to-[#E6B89C] rounded-full"></div>
+          <div className="absolute -top-2 right-4 w-12 h-12 bg-gradient-to-r from-[#E6B89C] to-[#9C7178] rounded-full"></div>
+          <div className="absolute -top-6 left-16 w-20 h-20 bg-gradient-to-r from-[#88B9B0] to-[#E6B89C] rounded-full"></div>
+        </div>
       </div>
-      <div className="cloud-decoration top-20 right-1/4">
-        <img 
-          src="https://images.unsplash.com/photo-1517056338492-99899a9fccf0?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.0.3" 
-          alt="" 
-          className="w-32 h-auto opacity-15"
-        />
+      <div className="absolute top-20 right-1/4 opacity-15">
+        <div className="relative">
+          {/* Smaller cloud */}
+          <div className="w-24 h-16 bg-gradient-to-r from-[#E6B89C] to-[#9C7178] rounded-full"></div>
+          <div className="absolute -top-3 left-4 w-12 h-12 bg-gradient-to-r from-[#88B9B0] to-[#E6B89C] rounded-full"></div>
+          <div className="absolute -top-1 right-2 w-8 h-8 bg-gradient-to-r from-[#E6B89C] to-[#9C7178] rounded-full"></div>
+          <div className="absolute -top-4 left-12 w-16 h-16 bg-gradient-to-r from-[#88B9B0] to-[#E6B89C] rounded-full"></div>
+        </div>
       </div>
       
       {/* Navigation */}
