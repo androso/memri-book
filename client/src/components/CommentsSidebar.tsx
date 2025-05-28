@@ -151,11 +151,8 @@ export function CommentsSidebar({ photoId, photoTitle, isOpen, onOpenChange, isD
       <div className="p-4 pb-2 border-b">
         <h2 className="flex items-center gap-2 font-quicksand font-bold text-lg text-[#9C7178]">
           <MessageCircle className="h-5 w-5 text-[#9C7178]" />
-          Photo Comments ({comments.length})
+          Comments
         </h2>
-        {photoTitle && (
-          <p className="text-sm text-gray-600 mt-1 truncate">{photoTitle}</p>
-        )}
       </div>
       
       {/* Comments list */}
