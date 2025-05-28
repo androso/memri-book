@@ -4,7 +4,7 @@ import { API_ENDPOINTS } from "@/lib/constants";
 import { Collection, Photo } from "@shared/schema";
 import { queryClient } from "@/lib/queryClient";
 import { apiRequest } from "@/lib/queryClient"; 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { WatercolorOverlay } from "@/components/ui/watercolor-overlay";
 import { HandDrawn } from "@/components/ui/hand-drawn";
 import { formatDate } from "@/lib/constants";
@@ -20,7 +20,9 @@ import {
   Calendar,
   Image,
   Plus,
-  MessageCircle
+  MessageCircle,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +35,11 @@ export default function ViewDateMemory() {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
   const [isCommentsSidebarOpen, setIsCommentsSidebarOpen] = useState(false);
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  
+  // Touch/swipe handling for photo slider
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
+  const minSwipeDistance = 50;
 
   // Early return if no id
   if (!id) {
@@ -89,6 +96,60 @@ export default function ViewDateMemory() {
       setIsDeleting(true);
     }
   };
+
+  // Photo slider navigation functions
+  const goToPrevPhoto = () => {
+    if (photos.length > 0) {
+      setActivePhotoIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1));
+    }
+  };
+
+  const goToNextPhoto = () => {
+    if (photos.length > 0) {
+      setActivePhotoIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1));
+    }
+  };
+
+  // Touch handlers for swipe navigation
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchEndX.current = null;
+    touchStartX.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX.current = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStartX.current || !touchEndX.current) return;
+    
+    const distance = touchStartX.current - touchEndX.current;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe && photos.length > 1) {
+      goToNextPhoto();
+    }
+    if (isRightSwipe && photos.length > 1) {
+      goToPrevPhoto();
+    }
+  };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (photos.length <= 1) return;
+      
+      if (e.key === 'ArrowLeft') {
+        goToPrevPhoto();
+      } else if (e.key === 'ArrowRight') {
+        goToNextPhoto();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [photos.length]);
 
   const isLoading = memoryLoading || photosLoading;
   const error = memoryError || photosError;
@@ -167,11 +228,50 @@ export default function ViewDateMemory() {
           <HandDrawn className="bg-white overflow-hidden shadow-lg">
             {activePhoto ? (
               <div className="relative">
-                <img 
-                  src={activePhoto.filePath} 
-                  alt={activePhoto.title || memory.name} 
-                  className="w-full object-contain max-h-[50vh]"
-                />
+                <div 
+                  className="relative overflow-hidden"
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                >
+                  <img 
+                    src={activePhoto.filePath} 
+                    alt={activePhoto.title || memory.name} 
+                    className="w-full object-contain max-h-[50vh] select-none"
+                    draggable={false}
+                  />
+                  
+                  {/* Navigation arrows - only show if more than 1 photo */}
+                  {photos.length > 1 && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white rounded-full"
+                        onClick={goToPrevPhoto}
+                      >
+                        <ChevronLeft className="h-6 w-6" />
+                      </Button>
+                      
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white rounded-full"
+                        onClick={goToNextPhoto}
+                      >
+                        <ChevronRight className="h-6 w-6" />
+                      </Button>
+                    </>
+                  )}
+                  
+                  {/* Photo counter */}
+                  {photos.length > 1 && (
+                    <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-50 text-white px-3 py-1 rounded-full text-sm">
+                      {activePhotoIndex + 1} / {photos.length}
+                    </div>
+                  )}
+                </div>
+                
                 <div className="absolute top-4 left-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
                   <MessageCircle className="inline h-3 w-3 mr-1" />
                   Comments for this photo
