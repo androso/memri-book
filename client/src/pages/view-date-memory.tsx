@@ -272,15 +272,13 @@ export default function ViewDateMemory() {
                   )}
                 </div>
                 
-                <div className="absolute top-4 left-4 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
-                  <MessageCircle className="inline h-3 w-3 mr-1" />
-                  Comments for this photo
-                </div>
+
                 <Button 
                   className="absolute top-4 right-4 bg-[#E6B89C] hover:bg-[#9C7178] text-white font-quicksand"
                   onClick={() => setIsUploadDialogOpen(true)}
                 >
-                  <Plus className="mr-2 h-4 w-4" /> Upload Photos
+                  <Plus className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">Upload Photos</span>
                 </Button>
               </div>
             ) : (
@@ -293,7 +291,8 @@ export default function ViewDateMemory() {
                   className="absolute top-4 right-4 bg-[#E6B89C] hover:bg-[#9C7178] text-white font-quicksand"
                   onClick={() => setIsUploadDialogOpen(true)}
                 >
-                  <Plus className="mr-2 h-4 w-4" /> Upload Photos
+                  <Plus className="h-4 w-4 md:mr-2" />
+                  <span className="hidden md:inline">Upload Photos</span>
                 </Button>
               </div>
             )}
