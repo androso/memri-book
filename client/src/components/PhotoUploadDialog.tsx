@@ -160,7 +160,7 @@ export function PhotoUploadDialog({ isOpen, onOpenChange, collectionId, onUpload
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
+      <DialogContent className="max-w-4xl h-[95vh] flex flex-col p-0">
         <DialogHeader className="flex-shrink-0 p-6 pb-4">
           <DialogTitle className="font-quicksand text-2xl text-[#9C7178]">
             Upload Photos to Memory
@@ -170,96 +170,100 @@ export function PhotoUploadDialog({ isOpen, onOpenChange, collectionId, onUpload
           </DialogDescription>
         </DialogHeader>
         
-        <div className="flex-1 flex flex-col px-6 min-h-0">
-          {/* Dropzone - Always visible */}
-          <div className="flex-shrink-0 mb-6">
-            <HandDrawn className="overflow-y-visible">
-              <div 
-                {...getRootProps()} 
-                className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all duration-200 ${
-                  isDragActive 
-                    ? 'border-[#9C7178] bg-[#9C7178] bg-opacity-5' 
-                    : 'border-[#88B9B0] hover:border-[#9C7178] hover:bg-gray-50'
-                }`}
-              >
-                <input {...getInputProps()} />
-                <CloudUpload className="h-16 w-16 text-[#88B9B0] mx-auto mb-4" />
-                <h3 className="text-xl font-quicksand font-bold text-[#4A4A4A] mb-2">
-                  {isDragActive ? "Drop your photos here!" : "Choose photos to upload"}
-                </h3>
-                <p className="text-gray-500 mb-6">
-                  Drag and drop your photos here, or click to browse your files
-                </p>
-                <Button 
-                  type="button" 
-                  className="bg-[#88B9B0] hover:bg-[#9C7178] text-white font-quicksand"
+        <div className="flex-1 overflow-hidden px-6">
+          <div className="h-full flex flex-col space-y-6">
+            {/* Dropzone - Always visible */}
+            <div className="flex-shrink-0">
+              <HandDrawn className="overflow-y-visible">
+                <div 
+                  {...getRootProps()} 
+                  className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200 ${
+                    isDragActive 
+                      ? 'border-[#9C7178] bg-[#9C7178] bg-opacity-5' 
+                      : 'border-[#88B9B0] hover:border-[#9C7178] hover:bg-gray-50'
+                  }`}
                 >
-                  <ImageIcon className="mr-2 h-4 w-4" />
-                  Browse Photos
-                </Button>
-              </div>
-            </HandDrawn>
-          </div>
-          
-          {/* Upload photos preview - Scrollable */}
-          {uploadPhotos.length > 0 && (
-            <div className="flex-1 flex flex-col min-h-0">
-              <div className="flex items-center justify-between mb-4 flex-shrink-0">
-                <h3 className="font-quicksand font-bold text-lg text-[#9C7178]">
-                  {uploadPhotos.length} photo{uploadPhotos.length !== 1 ? 's' : ''} ready to upload
-                </h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    uploadPhotos.forEach(photo => {
-                      URL.revokeObjectURL(photo.preview);
-                    });
-                    setUploadPhotos([]);
-                  }}
-                >
-                  Clear all
-                </Button>
-              </div>
-              
-              <HandDrawn className="bg-[#F4F1EA] p-4 flex-1 min-h-0">
-                <ScrollArea className="h-full">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pr-4">
-                    {uploadPhotos.map((photo, index) => (
-                      <div key={index} className="relative group bg-white rounded-lg p-3">
-                        <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 mb-3 relative">
-                          <img 
-                            src={photo.preview} 
-                            alt={`Upload ${index + 1}`} 
-                            className="w-full h-full object-cover"
-                          />
-                          <Button 
-                            variant="destructive" 
-                            size="sm"
-                            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-full w-6 h-6 p-0"
-                            onClick={() => removeUploadPhoto(index)}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                        
-                        <Input
-                          value={photo.title}
-                          onChange={(e) => {
-                            const newPhotos = [...uploadPhotos];
-                            newPhotos[index].title = e.target.value;
-                            setUploadPhotos(newPhotos);
-                          }}
-                          className="text-sm"
-                          placeholder="Enter photo title..."
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
+                  <input {...getInputProps()} />
+                  <CloudUpload className="h-12 w-12 text-[#88B9B0] mx-auto mb-3" />
+                  <h3 className="text-lg font-quicksand font-bold text-[#4A4A4A] mb-2">
+                    {isDragActive ? "Drop your photos here!" : "Choose photos to upload"}
+                  </h3>
+                  <p className="text-gray-500 mb-4">
+                    Drag and drop your photos here, or click to browse your files
+                  </p>
+                  <Button 
+                    type="button" 
+                    className="bg-[#88B9B0] hover:bg-[#9C7178] text-white font-quicksand"
+                  >
+                    <ImageIcon className="mr-2 h-4 w-4" />
+                    Browse Photos
+                  </Button>
+                </div>
               </HandDrawn>
             </div>
-          )}
+            
+            {/* Upload photos preview - Scrollable */}
+            {uploadPhotos.length > 0 && (
+              <div className="flex-1 min-h-0 flex flex-col">
+                <div className="flex items-center justify-between mb-3 flex-shrink-0">
+                  <h3 className="font-quicksand font-bold text-lg text-[#9C7178]">
+                    {uploadPhotos.length} photo{uploadPhotos.length !== 1 ? 's' : ''} ready to upload
+                  </h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      uploadPhotos.forEach(photo => {
+                        URL.revokeObjectURL(photo.preview);
+                      });
+                      setUploadPhotos([]);
+                    }}
+                  >
+                    Clear all
+                  </Button>
+                </div>
+                
+                <div className="flex-1 min-h-0">
+                  <HandDrawn className="bg-[#F4F1EA] p-4 h-full">
+                    <ScrollArea className="h-full">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pr-4 pb-4">
+                        {uploadPhotos.map((photo, index) => (
+                          <div key={index} className="relative group bg-white rounded-lg p-3">
+                            <div className="aspect-square rounded-lg overflow-hidden bg-gray-100 mb-3 relative">
+                              <img 
+                                src={photo.preview} 
+                                alt={`Upload ${index + 1}`} 
+                                className="w-full h-full object-cover"
+                              />
+                              <Button 
+                                variant="destructive" 
+                                size="sm"
+                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity rounded-full w-6 h-6 p-0"
+                                onClick={() => removeUploadPhoto(index)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                            
+                            <Input
+                              value={photo.title}
+                              onChange={(e) => {
+                                const newPhotos = [...uploadPhotos];
+                                newPhotos[index].title = e.target.value;
+                                setUploadPhotos(newPhotos);
+                              }}
+                              className="text-sm"
+                              placeholder="Enter photo title..."
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </HandDrawn>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
         
         {/* Footer */}
