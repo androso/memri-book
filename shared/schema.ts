@@ -46,7 +46,6 @@ export const photos = pgTable("photos", {
   filePath: text("file_path").notNull(),
   isLiked: boolean("is_liked").default(false),
   collectionId: integer("collection_id").references(() => collections.id),
-  userId: integer("user_id").references(() => users.id),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
 });
 
@@ -103,7 +102,6 @@ export const insertPhotoSchema = createInsertSchema(photos).pick({
   filePath: true,
   isLiked: true,
   collectionId: true,
-  userId: true,
   uploadedAt: true,
 });
 

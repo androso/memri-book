@@ -342,13 +342,32 @@ export class DbStorage implements IStorage {
   // Photo operations
   async getPhotos(userId: number, collectionId?: number): Promise<Photo[]> {
     if (collectionId) {
+      // First check if user owns this collection
+      const hasAccess = await this.checkCollectionOwnership(collectionId, userId);
+      if (!hasAccess) {
+        return [];
+      }
+      
       const result = await db.select().from(photos)
-        .where(and(eq(photos.userId, userId), eq(photos.collectionId, collectionId)))
+        .where(eq(photos.collectionId, collectionId))
         .orderBy(desc(photos.uploadedAt));
       return result;
     } else {
-      const result = await db.select().from(photos)
-        .where(eq(photos.userId, userId))
+      // Get all photos from collections that the user owns
+      const result = await db.select({
+        id: photos.id,
+        title: photos.title,
+        description: photos.description,
+        fileName: photos.fileName,
+        fileType: photos.fileType,
+        filePath: photos.filePath,
+        isLiked: photos.isLiked,
+        collectionId: photos.collectionId,
+        uploadedAt: photos.uploadedAt,
+      }).from(photos)
+        .innerJoin(collections, eq(photos.collectionId, collections.id))
+        .innerJoin(collectionOwners, eq(collections.id, collectionOwners.collectionId))
+        .where(eq(collectionOwners.userId, userId))
         .orderBy(desc(photos.uploadedAt));
       return result;
     }
@@ -443,7 +462,7 @@ export class DbStorage implements IStorage {
   async getComments(photoId: number): Promise<Comment[]> {
     return await db.select().from(comments)
       .where(eq(comments.photoId, photoId))
-      .orderBy(desc(comments.createdAt));
+      .orderBy(comments.createdAt);
   }
   
   async getComment(id: number): Promise<Comment | undefined> {

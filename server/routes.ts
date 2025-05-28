@@ -280,7 +280,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             fileName: fileName,
             fileType: file.mimetype,
             filePath: filePath,
-            userId: req.user.id,
             collectionId: collection.id,
             isLiked: false
           }));
@@ -418,7 +417,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const collectionId = req.query.collectionId ? parseInt(req.query.collectionId as string) : undefined;
+      console.log({collectionId})
       const photos = await storage.getPhotos(req.user.id, collectionId);
+      
       return res.json(photos);
     } catch (error) {
       console.error('Error fetching photos:', error);
@@ -439,6 +440,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const file = req.file;
       console.log(`Uploading photo for user ${req.user.username}: ${file.originalname} (${file.size} bytes)`);
       
+      // Check if user owns the collection before creating the photo
+      const collectionId = parseInt(req.body.collectionId);
+      if (isNaN(collectionId)) {
+        return res.status(400).json({ message: 'Invalid collection ID' });
+      }
+      
+      const hasAccess = await storage.checkCollectionOwnership(collectionId, req.user.id);
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Not authorized to add photos to this collection' });
+      }
+      
       // Generate unique filename and save to filesystem
       const fileName = generateFileName(file.originalname);
       const filePath = await storage.savePhotoToFilesystem(file.buffer, fileName);
@@ -449,8 +461,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fileName: fileName,
         fileType: file.mimetype,
         filePath: filePath,
-        userId: req.user.id,
-        collectionId: parseInt(req.body.collectionId),
+        collectionId: collectionId,
         isLiked: req.body.isLiked === 'true'
       });
 
@@ -500,9 +511,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Photo not found' });
       }
 
-      // Check if user owns this photo
-      if (photo.userId !== req.user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this photo' });
+      // Check if user owns the collection containing this photo
+      if (photo.collectionId) {
+        const hasAccess = await storage.checkCollectionOwnership(photo.collectionId, req.user.id);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Not authorized to access this photo' });
+        }
       }
 
       return res.json(photo);
@@ -528,8 +542,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Photo not found' });
       }
 
-      if (photo.userId !== req.user.id) {
-        return res.status(403).json({ message: 'Not authorized to update this photo' });
+      // Check if user owns the collection containing this photo
+      if (photo.collectionId) {
+        const hasAccess = await storage.checkCollectionOwnership(photo.collectionId, req.user.id);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Not authorized to update this photo' });
+        }
       }
 
       const data = validateSchema(insertPhotoSchema.partial(), req.body);
@@ -557,9 +575,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Photo not found' });
       }
 
-      // Check if user owns this photo
-      if (photo.userId !== req.user.id) {
-        return res.status(403).json({ message: 'Not authorized to like this photo' });
+      // Check if user owns the collection containing this photo
+      if (photo.collectionId) {
+        const hasAccess = await storage.checkCollectionOwnership(photo.collectionId, req.user.id);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Not authorized to like this photo' });
+        }
       }
 
       const updatedPhoto = await storage.toggleLikePhoto(photoId);
@@ -586,8 +607,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Photo not found' });
       }
 
-      if (photo.userId !== req.user.id) {
-        return res.status(403).json({ message: 'Not authorized to delete this photo' });
+      // Check if user owns the collection containing this photo
+      if (photo.collectionId) {
+        const hasAccess = await storage.checkCollectionOwnership(photo.collectionId, req.user.id);
+        if (!hasAccess) {
+          return res.status(403).json({ message: 'Not authorized to delete this photo' });
+        }
       }
 
       const success = await storage.deletePhoto(photoId);
